@@ -1,0 +1,134 @@
+using System;
+using UnityEngine;
+using Sirenix.OdinInspector;
+using Sirenix.Serialization;
+
+namespace Sokoban
+{
+    /// <summary>
+    /// 单关卡资产（每关一个 .asset 文件）。资源名 = 资产文件名(<c>this.name</c>)，关卡名 = <see cref="levelName"/>。
+    /// 用 Odin <see cref="SerializedScriptableObject"/> 才能序列化 <c>CellType[,]</c>。
+    /// <c>cells[col, row]</c>，col∈[0,Width) row∈[0,Height)。
+    /// </summary>
+    [CreateAssetMenu(fileName = "Level", menuName = "Sokoban/Level Asset", order = 0)]
+    public class LevelAsset : SerializedScriptableObject
+    {
+        // 关卡名由编辑器窗口的「关卡名 / 应用」渲染，这里从默认 Inspector 隐藏避免重复。
+        [HideInInspector]
+        public string levelName = "新关卡";
+
+        // 网格仅在窗口点「进入关卡编辑」后显示（LevelEditing.ShowGrid 由窗口切换）。
+        [ShowIf("@Sokoban.LevelEditing.ShowGrid")]
+        [TableMatrix(SquareCells = true, DrawElementMethod = "DrawCell",
+            ResizableColumns = false, HideColumnIndices = true, HideRowIndices = true)]
+        [OdinSerialize]
+        public CellType[,] cells = CreateEmpty(8, 7);
+
+        public int Width => cells == null ? 0 : cells.GetLength(0);
+        public int Height => cells == null ? 0 : cells.GetLength(1);
+
+        public static CellType[,] CreateEmpty(int width, int height)
+        {
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+            var grid = new CellType[width, height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    grid[x, y] = (x == 0 || y == 0 || x == width - 1 || y == height - 1)
+                        ? CellType.Wall : CellType.Floor;
+            return grid;
+        }
+
+        /// <summary>改变网格尺寸，保留左上角重叠区域内容。</summary>
+        public void Resize(int width, int height)
+        {
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+            var grid = CreateEmpty(width, height);
+            int w = Mathf.Min(width, Width);
+            int h = Mathf.Min(height, Height);
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    grid[x, y] = cells[x, y];
+            cells = grid;
+        }
+
+        /// <summary>从另一关深拷贝内容（用于复制关卡）。</summary>
+        public void CopyFrom(LevelAsset other)
+        {
+            levelName = other.levelName;
+            cells = (CellType[,])other.cells.Clone();
+        }
+
+        // ---------- 统计 ----------
+
+        public int CellCount => Width * Height;
+        public int CountWalls() => Count(c => c.IsWall());
+        public int CountFloors() => Count(c => !c.IsWall());     // 非墙格子运行时都会铺地板
+        public int CountTargets() => Count(c => c.IsTarget());
+        public int CountBoxes() => Count(c => c.HasBox());
+        public int CountPlayers() => Count(c => c.HasPlayer());
+
+        /// <summary>预览/运行时会生成的对象总数：墙 + 地板 + 目标 + 箱子 + 玩家。</summary>
+        public int EntityCount()
+        {
+            int n = 0;
+            for (int x = 0; x < Width; x++)
+                for (int y = 0; y < Height; y++)
+                {
+                    var c = cells[x, y];
+                    if (c.IsWall()) { n++; continue; }
+                    n++;                       // 地板
+                    if (c.IsTarget()) n++;
+                    if (c.HasBox() || c.HasPlayer()) n++;
+                }
+            return n;
+        }
+
+        private int Count(Func<CellType, bool> pred)
+        {
+            int n = 0;
+            for (int x = 0; x < Width; x++)
+                for (int y = 0; y < Height; y++)
+                    if (pred(cells[x, y])) n++;
+            return n;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Odin TableMatrix 单元绘制：着色 + 点击/拖拽用当前画笔写入。仅编辑器。</summary>
+        private static CellType DrawCell(Rect rect, CellType value)
+        {
+            var e = Event.current;
+            if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag) &&
+                rect.Contains(e.mousePosition))
+            {
+                value = LevelEditing.Brush;
+                GUI.changed = true;
+                e.Use();
+            }
+
+            var inner = new Rect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
+            UnityEditor.EditorGUI.DrawRect(inner, value.ToColor());
+
+            char sym = value.ToSymbol();
+            if (sym != ' ')
+            {
+                var style = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontStyle = FontStyle.Bold,
+                };
+                GUI.Label(rect, sym.ToString(), style);
+            }
+            return value;
+        }
+#endif
+    }
+
+    /// <summary>关卡编辑器的共享状态。供 <see cref="LevelAsset"/> 的绘制/显示控制读取。</summary>
+    public static class LevelEditing
+    {
+        public static CellType Brush = CellType.Wall;
+        public static bool ShowGrid;   // 「进入关卡编辑」时为 true，控制网格是否显示
+    }
+}
