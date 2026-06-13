@@ -1,3 +1,4 @@
+using System;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -20,13 +21,6 @@ namespace Sokoban
     [UpdateInGroup(typeof(InitializationSystemGroup))]
     public partial class LevelSpawnSystem : SystemBase
     {
-        // 各类元素的视觉参数：y 高度 + 非均匀缩放。
-        private static readonly float3 FloorScale = new float3(1f, 0.1f, 1f);
-        private static readonly float3 WallScale = new float3(1f, 1f, 1f);
-        private static readonly float3 TargetScale = new float3(0.45f, 0.04f, 0.45f);
-        private static readonly float3 BoxScale = new float3(0.8f, 0.8f, 0.8f);
-        private static readonly float3 PlayerScale = new float3(0.7f, 1f, 0.7f);
-
         protected override void OnCreate()
         {
             RequireForUpdate<RespawnRequest>();
@@ -99,7 +93,9 @@ namespace Sokoban
             var desc = new RenderMeshDescription(ShadowCastingMode.On, receiveShadows: true);
 
             // —— 第 2 遍：建可渲染实体（结构性变更，此后不再触碰 grid 缓冲）。
+            // 几何（材质索引 / y / scale）来自共享的 CellVisuals，保证与编辑器预览一致。
             // 防御：即使数据里误放了多个玩家，也只标记第一个为 Player，避免破坏单例查询。
+            Span<CellVisual> visuals = stackalloc CellVisual[CellVisuals.MaxPerCell];
             bool playerPlaced = false;
             for (int row = 0; row < H; row++)
             {
@@ -108,30 +104,28 @@ namespace Sokoban
                     var c = level.cells[col, row];
                     var cell = new int2(col, row);
 
-                    if (c.IsWall())
+                    int count = CellVisuals.Collect(c, visuals);
+                    for (int k = 0; k < count; k++)
                     {
-                        CreateVisual(em, rma, desc, res.CubeMesh, 1, cell, 0.5f, WallScale);
-                        continue;
-                    }
+                        var v = visuals[k];
+                        if (v.Kind == VisualKind.Player && playerPlaced)
+                            continue; // 多玩家：只保留第一个
 
-                    CreateVisual(em, rma, desc, res.CubeMesh, 0, cell, -0.05f, FloorScale);
-                    if (c.IsTarget())
-                        CreateVisual(em, rma, desc, res.CubeMesh, 2, cell, 0.03f, TargetScale);
-
-                    if (c.HasBox())
-                    {
-                        var e = CreateVisual(em, rma, desc, res.CubeMesh, 3, cell, 0.4f, BoxScale);
-                        em.AddComponentData(e, new GridPosition { Value = cell });
-                        em.AddComponent<Box>(e);
-                        em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(CellType.Box.ToColor()) });
-                    }
-                    else if (c.HasPlayer() && !playerPlaced)
-                    {
-                        playerPlaced = true;
-                        var e = CreateVisual(em, rma, desc, res.CubeMesh, 4, cell, 0.5f, PlayerScale);
-                        em.AddComponentData(e, new GridPosition { Value = cell });
-                        em.AddComponent<Player>(e);
-                        em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(CellType.Player.ToColor()) });
+                        var e = CreateVisual(em, rma, desc, res.CubeMesh, v.MaterialIndex, cell, v.Y, v.Scale);
+                        switch (v.Kind)
+                        {
+                            case VisualKind.Box:
+                                em.AddComponentData(e, new GridPosition { Value = cell });
+                                em.AddComponent<Box>(e);
+                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(CellType.Box.ToColor()) });
+                                break;
+                            case VisualKind.Player:
+                                playerPlaced = true;
+                                em.AddComponentData(e, new GridPosition { Value = cell });
+                                em.AddComponent<Player>(e);
+                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(CellType.Player.ToColor()) });
+                                break;
+                        }
                     }
                 }
             }

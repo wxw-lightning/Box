@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
@@ -33,16 +34,9 @@ namespace Sokoban.Editor
             w.Show();
         }
 
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            LevelEditing.ShowGrid = false;
-        }
-
         protected override void OnDestroy()
         {
             base.OnDestroy();
-            LevelEditing.ShowGrid = false;
             LevelPreview.Clear();
         }
 
@@ -128,30 +122,80 @@ namespace Sokoban.Editor
             if (GUILayout.Button("清空场景预览", GUILayout.Width(110))) LevelPreview.Clear();
             EditorGUILayout.EndHorizontal();
 
-            // ===== 关卡编辑 =====
+            // ===== 关卡编辑（始终可见）=====
             SirenixEditorGUI.Title("关卡编辑", null, TextAlignment.Left, true, true);
-            if (GUILayout.Button(LevelEditing.ShowGrid ? "退出关卡编辑" : "进入关卡编辑", GUILayout.Height(26)))
-                LevelEditing.ShowGrid = !LevelEditing.ShowGrid;
+            DrawBrushBar();
+            DrawQuickFillBar(selected);
 
-            if (LevelEditing.ShowGrid)
+            SirenixEditorGUI.BeginHorizontalToolbar();
+            GUILayout.Label("尺寸 W×H", GUILayout.Width(58));
+            _newWidth = Mathf.Max(1, EditorGUILayout.IntField(_newWidth, GUILayout.Width(38)));
+            _newHeight = Mathf.Max(1, EditorGUILayout.IntField(_newHeight, GUILayout.Width(38)));
+            if (SirenixEditorGUI.ToolbarButton(new GUIContent("调整尺寸")))
             {
-                DrawBrushBar();
-                DrawQuickFillBar(selected);
+                selected.Resize(_newWidth, _newHeight);
+                MarkAndPreview(selected);
+            }
+            GUILayout.FlexibleSpace();
+            SirenixEditorGUI.EndHorizontalToolbar();
 
-                SirenixEditorGUI.BeginHorizontalToolbar();
-                GUILayout.Label("尺寸 W×H", GUILayout.Width(58));
-                _newWidth = Mathf.Max(1, EditorGUILayout.IntField(_newWidth, GUILayout.Width(38)));
-                _newHeight = Mathf.Max(1, EditorGUILayout.IntField(_newHeight, GUILayout.Width(38)));
-                if (SirenixEditorGUI.ToolbarButton(new GUIContent("调整尺寸")))
+            GUILayout.Space(6);
+            DrawGridSection(selected);
+        }
+
+        // ---------- 固定像素尺寸的网格自绘（不随窗口缩放） ----------
+
+        private const float CellSize = 60f; // 单元像素尺寸；改这里调整大小
+
+        private void DrawGridSection(LevelAsset lvl)
+        {
+            int W = lvl.Width, H = lvl.Height;
+            var before = GetPlayerCells(lvl);
+            var e = Event.current;
+            bool painted = false;
+
+            for (int row = 0; row < H; row++)
+            {
+                EditorGUILayout.BeginHorizontal();
+                for (int col = 0; col < W; col++)
                 {
-                    selected.Resize(_newWidth, _newHeight);
-                    MarkAndPreview(selected);
+                    Rect r = GUILayoutUtility.GetRect(CellSize, CellSize,
+                        GUILayout.Width(CellSize), GUILayout.Height(CellSize));
+
+                    if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag)
+                        && e.button == 0 && r.Contains(e.mousePosition))
+                    {
+                        lvl.cells[col, row] = LevelEditing.Brush;
+                        painted = true;
+                        e.Use();
+                    }
+
+                    EditorGUI.DrawRect(new Rect(r.x + 1, r.y + 1, r.width - 2, r.height - 2),
+                        lvl.cells[col, row].ToColor());
+
+                    char sym = lvl.cells[col, row].ToSymbol();
+                    if (sym != ' ')
+                        GUI.Label(r, sym.ToString(), CellLabelStyle);
                 }
-                GUILayout.FlexibleSpace();
-                SirenixEditorGUI.EndHorizontalToolbar();
-                // 网格本体由下方默认 Inspector（cells 的 TableMatrix，受 ShowGrid 控制）绘制。
+                GUILayout.EndHorizontal();
+            }
+
+            if (painted)
+            {
+                EnforceSinglePlayer(lvl, before);
+                EditorUtility.SetDirty(lvl);
+                if (_autoPreview && LevelPreview.HasPreview)
+                    LevelPreview.Generate(lvl);
+                Repaint();
+                SceneView.RepaintAll();
             }
         }
+
+        private static GUIStyle _cellLabelStyle;
+        private static GUIStyle CellLabelStyle => _cellLabelStyle ??= new GUIStyle(EditorStyles.boldLabel)
+        {
+            alignment = TextAnchor.MiddleCenter,
+        };
 
         // ---------- 可玩性指示 / 画笔 / 快速填充 ----------
 
@@ -231,18 +275,33 @@ namespace Sokoban.Editor
                 LevelPreview.Generate(lvl);
         }
 
-        protected override void OnEndDrawEditors()
+        // ---------- 维持「至多一个玩家」 ----------
+
+        private List<Vector2Int> GetPlayerCells(LevelAsset lvl)
         {
-            // 网格涂改后标脏并（按需）刷新预览。
-            if (GUI.changed && _db != null)
+            var list = new List<Vector2Int>();
+            for (int x = 0; x < lvl.Width; x++)
+                for (int y = 0; y < lvl.Height; y++)
+                    if (lvl.cells[x, y].HasPlayer())
+                        list.Add(new Vector2Int(x, y));
+            return list;
+        }
+
+        private void EnforceSinglePlayer(LevelAsset lvl, List<Vector2Int> before)
+        {
+            var current = GetPlayerCells(lvl);
+            if (current.Count <= 1) return;
+
+            // 优先保留「本次新画的」玩家（涂改前不存在的那个）；找不到则保留最后一个。
+            int keepIdx = current.FindIndex(c => !before.Contains(c));
+            if (keepIdx < 0) keepIdx = current.Count - 1;
+
+            for (int i = 0; i < current.Count; i++)
             {
-                var selected = MenuTree?.Selection?.SelectedValue as LevelAsset;
-                if (selected != null)
-                {
-                    EditorUtility.SetDirty(selected);
-                    if (_autoPreview && LevelPreview.HasPreview)
-                        LevelPreview.Generate(selected);
-                }
+                if (i == keepIdx) continue;
+                var c = current[i];
+                // 清除该处玩家：在目标上则回到目标，否则回到地板。
+                lvl.cells[c.x, c.y] = lvl.cells[c.x, c.y].IsTarget() ? CellType.Target : CellType.Floor;
             }
         }
 

@@ -24,41 +24,35 @@ namespace Sokoban.Editor
             _root = new GameObject(RootName) { hideFlags = HideFlags.DontSave };
             int count = 0;
 
+            // 几何（y / scale / 展开规则）来自共享的 CellVisuals，保证与运行时 LevelSpawnSystem 一致。
+            System.Span<CellVisual> visuals = stackalloc CellVisual[CellVisuals.MaxPerCell];
             for (int row = 0; row < level.Height; row++)
             {
                 for (int col = 0; col < level.Width; col++)
                 {
                     var c = level.cells[col, row];
-                    if (c.IsWall())
+                    int n = CellVisuals.Collect(c, visuals);
+                    for (int k = 0; k < n; k++)
                     {
-                        Spawn(col, row, 0.5f, new Vector3(1f, 1f, 1f), CellType.Wall.ToColor(), "Wall");
-                        count++;
-                        continue;
-                    }
-
-                    Spawn(col, row, -0.05f, new Vector3(1f, 0.1f, 1f), CellType.Floor.ToColor(), "Floor");
-                    count++;
-
-                    if (c.IsTarget())
-                    {
-                        Spawn(col, row, 0.03f, new Vector3(0.45f, 0.04f, 0.45f), CellType.Target.ToColor(), "Target");
-                        count++;
-                    }
-                    if (c.HasBox())
-                    {
-                        var color = (c == CellType.BoxOnTarget ? CellType.BoxOnTarget : CellType.Box).ToColor();
-                        Spawn(col, row, 0.4f, new Vector3(0.8f, 0.8f, 0.8f), color, "Box");
-                        count++;
-                    }
-                    else if (c.HasPlayer())
-                    {
-                        Spawn(col, row, 0.5f, new Vector3(0.7f, 1f, 0.7f), CellType.Player.ToColor(), "Player");
+                        var v = visuals[k];
+                        Spawn(col, row, v.Y, v.Scale, ColorFor(v.Kind, c), v.Kind.ToString());
                         count++;
                     }
                 }
             }
             return count;
         }
+
+        // 预览着色：与运行时 BoxColorSystem 等价——箱子在目标上显示绿色，其余用各自基础色。
+        private static Color ColorFor(VisualKind kind, CellType cell) => kind switch
+        {
+            VisualKind.Wall => CellType.Wall.ToColor(),
+            VisualKind.Floor => CellType.Floor.ToColor(),
+            VisualKind.Target => CellType.Target.ToColor(),
+            VisualKind.Box => (cell == CellType.BoxOnTarget ? CellType.BoxOnTarget : CellType.Box).ToColor(),
+            VisualKind.Player => CellType.Player.ToColor(),
+            _ => Color.gray,
+        };
 
         public static void Clear()
         {

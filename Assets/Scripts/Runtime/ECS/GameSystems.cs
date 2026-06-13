@@ -138,10 +138,26 @@ namespace Sokoban
     [UpdateAfter(typeof(MovementSystem))]
     public partial class MoveAnimationSystem : SystemBase
     {
-        protected override void OnCreate() => RequireForUpdate<GameState>();
+        private EntityQuery _animQuery;
+
+        protected override void OnCreate()
+        {
+            RequireForUpdate<GameState>();
+            _animQuery = GetEntityQuery(ComponentType.ReadOnly<MoveAnimation>());
+        }
 
         protected override void OnUpdate()
         {
+            // 没有动画在跑：跳过 ECB 分配与遍历；仅在状态需要时把 Animating 落为 false
+            // （撤销时 ControlSystem.Snap 会直接移除 MoveAnimation，故这里仍需负责清标志）。
+            if (_animQuery.IsEmptyIgnoreFilter)
+            {
+                var st = SystemAPI.GetSingletonRW<GameState>();
+                if (st.ValueRO.Animating)
+                    st.ValueRW.Animating = false;
+                return;
+            }
+
             float dt = SystemAPI.Time.DeltaTime;
             var ecb = new EntityCommandBuffer(Allocator.Temp);
             int active = 0;

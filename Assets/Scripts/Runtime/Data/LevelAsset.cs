@@ -17,10 +17,10 @@ namespace Sokoban
         [HideInInspector]
         public string levelName = "新关卡";
 
-        // 网格仅在窗口点「进入关卡编辑」后显示（LevelEditing.ShowGrid 由窗口切换）。
-        [ShowIf("@Sokoban.LevelEditing.ShowGrid")]
-        [TableMatrix(SquareCells = true, DrawElementMethod = "DrawCell",
-            ResizableColumns = false, HideColumnIndices = true, HideRowIndices = true)]
+        // 网格由编辑器窗口用固定像素尺寸自绘（见 LevelEditorWindow.DrawGridSection），
+        // 不用 Odin TableMatrix（其 SquareCells 会按可用宽度缩放、忽略 RowHeight）。
+        // 这里从默认 Inspector 隐藏，仅保留 Odin 序列化到 .asset。
+        [HideInInspector]
         [OdinSerialize]
         public CellType[,] cells = CreateEmpty(8, 7);
 
@@ -72,16 +72,11 @@ namespace Sokoban
         /// <summary>预览/运行时会生成的对象总数：墙 + 地板 + 目标 + 箱子 + 玩家。</summary>
         public int EntityCount()
         {
+            Span<CellVisual> visuals = stackalloc CellVisual[CellVisuals.MaxPerCell];
             int n = 0;
             for (int x = 0; x < Width; x++)
                 for (int y = 0; y < Height; y++)
-                {
-                    var c = cells[x, y];
-                    if (c.IsWall()) { n++; continue; }
-                    n++;                       // 地板
-                    if (c.IsTarget()) n++;
-                    if (c.HasBox() || c.HasPlayer()) n++;
-                }
+                    n += CellVisuals.Collect(cells[x, y], visuals);
             return n;
         }
 
@@ -93,42 +88,11 @@ namespace Sokoban
                     if (pred(cells[x, y])) n++;
             return n;
         }
-
-#if UNITY_EDITOR
-        /// <summary>Odin TableMatrix 单元绘制：着色 + 点击/拖拽用当前画笔写入。仅编辑器。</summary>
-        private static CellType DrawCell(Rect rect, CellType value)
-        {
-            var e = Event.current;
-            if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag) &&
-                rect.Contains(e.mousePosition))
-            {
-                value = LevelEditing.Brush;
-                GUI.changed = true;
-                e.Use();
-            }
-
-            var inner = new Rect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
-            UnityEditor.EditorGUI.DrawRect(inner, value.ToColor());
-
-            char sym = value.ToSymbol();
-            if (sym != ' ')
-            {
-                var style = new GUIStyle(GUI.skin.label)
-                {
-                    alignment = TextAnchor.MiddleCenter,
-                    fontStyle = FontStyle.Bold,
-                };
-                GUI.Label(rect, sym.ToString(), style);
-            }
-            return value;
-        }
-#endif
     }
 
-    /// <summary>关卡编辑器的共享状态。供 <see cref="LevelAsset"/> 的绘制/显示控制读取。</summary>
+    /// <summary>关卡编辑器的共享状态（当前画笔）。供 <see cref="LevelAsset"/> 的绘制方法读取。</summary>
     public static class LevelEditing
     {
         public static CellType Brush = CellType.Wall;
-        public static bool ShowGrid;   // 「进入关卡编辑」时为 true，控制网格是否显示
     }
 }

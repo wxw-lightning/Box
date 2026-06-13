@@ -45,6 +45,12 @@ namespace Sokoban
             var mesh = cubeMesh != null ? cubeMesh : Resources.GetBuiltinResource<Mesh>("Cube.fbx");
 
             var world = World.DefaultGameObjectInjectionWorld;
+            if (world == null || !world.IsCreated)
+            {
+                Debug.LogError("[Sokoban] 默认 ECS World 不可用，Bootstrap 已中止。");
+                enabled = false;
+                return;
+            }
             var em = world.EntityManager;
 
             var singleton = em.CreateEntity();

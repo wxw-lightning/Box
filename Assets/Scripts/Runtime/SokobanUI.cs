@@ -19,6 +19,12 @@ namespace Sokoban
         private EntityQuery _ctrlQuery;
         private bool _worldReady;
 
+        // 缓存上次显示的状态，避免每帧重建信息字符串（GC）/重复刷新面板。
+        private int _lastLevelIndex = -1;
+        private int _lastLevelCount = -1;
+        private int _lastMoves = -1;
+        private bool _lastWon;
+
         private void Start()
         {
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -43,9 +49,23 @@ namespace Sokoban
                 return;
 
             var state = _stateQuery.GetSingleton<GameState>();
-            _infoText.text = $"关卡 {state.LevelIndex + 1}/{state.LevelCount}    步数 {state.Moves}\n" +
-                             "方向键/WASD 移动   U 撤销   R 重玩   N/P 切关";
-            _winPanel.SetActive(state.Won);
+
+            if (state.LevelIndex != _lastLevelIndex ||
+                state.LevelCount != _lastLevelCount ||
+                state.Moves != _lastMoves)
+            {
+                _lastLevelIndex = state.LevelIndex;
+                _lastLevelCount = state.LevelCount;
+                _lastMoves = state.Moves;
+                _infoText.text = $"关卡 {state.LevelIndex + 1}/{state.LevelCount}    步数 {state.Moves}\n" +
+                                 "方向键/WASD 移动   U 撤销   R 重玩   N/P 切关";
+            }
+
+            if (state.Won != _lastWon)
+            {
+                _lastWon = state.Won;
+                _winPanel.SetActive(state.Won);
+            }
         }
 
         // ---------- 按钮 → 写 ControlRequest ----------
