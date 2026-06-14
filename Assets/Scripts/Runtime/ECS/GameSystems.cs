@@ -203,11 +203,12 @@ namespace Sokoban
 
             bool all = true;
             int count = 0;
-            foreach (var gp in SystemAPI.Query<RefRO<GridPosition>>().WithAll<Box>())
+            foreach (var (gp, kind) in SystemAPI.Query<RefRO<GridPosition>, RefRO<BoxKind>>().WithAll<Box>())
             {
                 count++;
                 int2 p = gp.ValueRO.Value;
-                if ((grid[p.y * W + p.x].Flags & GridFlags.Target) == 0) { all = false; break; }
+                byte need = kind.ValueRO.Value == 1 ? GridFlags.TargetB : GridFlags.TargetA;
+                if ((grid[p.y * W + p.x].Flags & need) == 0) { all = false; break; }
             }
             if (count > 0 && all)
                 stateRef.ValueRW.Won = true;
@@ -227,15 +228,20 @@ namespace Sokoban
             var singleton = SystemAPI.GetSingletonEntity<GameState>();
             var grid = EntityManager.GetBuffer<GridCell>(singleton);
 
-            float4 onColor = ToFloat4(CellType.BoxOnTarget.ToColor());
-            float4 offColor = ToFloat4(CellType.Box.ToColor());
+            // 每属性各自的基础色与「已满足」提亮色（绿仍绿、紫仍紫）。
+            float4 baseA = ToFloat4(CellType.Box.ToColor());
+            float4 onA = ToFloat4(CellType.BoxOnTarget.ToColor());
+            float4 baseB = ToFloat4(CellType.BoxB.ToColor());
+            float4 onB = ToFloat4(CellType.BoxBOnTarget.ToColor());
 
-            foreach (var (gp, col) in
-                     SystemAPI.Query<RefRO<GridPosition>, RefRW<URPMaterialPropertyBaseColor>>().WithAll<Box>())
+            foreach (var (gp, kind, col) in
+                     SystemAPI.Query<RefRO<GridPosition>, RefRO<BoxKind>, RefRW<URPMaterialPropertyBaseColor>>().WithAll<Box>())
             {
                 int2 p = gp.ValueRO.Value;
-                bool onTarget = (grid[p.y * W + p.x].Flags & GridFlags.Target) != 0;
-                col.ValueRW.Value = onTarget ? onColor : offColor;
+                bool isB = kind.ValueRO.Value == 1;
+                byte need = isB ? GridFlags.TargetB : GridFlags.TargetA;
+                bool onMatch = (grid[p.y * W + p.x].Flags & need) != 0;
+                col.ValueRW.Value = onMatch ? (isB ? onB : onA) : (isB ? baseB : baseA);
             }
         }
 

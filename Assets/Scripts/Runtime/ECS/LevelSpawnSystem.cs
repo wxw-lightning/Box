@@ -79,7 +79,8 @@ namespace Sokoban
                     var c = level.cells[col, row];
                     byte flags = 0;
                     if (c.IsWall()) flags |= GridFlags.Wall;
-                    if (c.IsTarget()) flags |= GridFlags.Target;
+                    if (c.IsTargetA()) flags |= GridFlags.TargetA;
+                    if (c.IsTargetB()) flags |= GridFlags.TargetB;
                     grid[row * W + col] = new GridCell { Flags = flags };
                 }
             }
@@ -115,9 +116,16 @@ namespace Sokoban
                         switch (v.Kind)
                         {
                             case VisualKind.Box:
+                                byte boxKind = c.BoxKindOf();
                                 em.AddComponentData(e, new GridPosition { Value = cell });
                                 em.AddComponent<Box>(e);
-                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(CellType.Box.ToColor()) });
+                                em.AddComponentData(e, new BoxKind { Value = boxKind });
+                                var boxColor = (boxKind == 1 ? CellType.BoxB : CellType.Box).ToColor();
+                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(boxColor) });
+                                break;
+                            case VisualKind.Target:
+                                var targetColor = (c.TargetKindOf() == 1 ? CellType.TargetB : CellType.Target).ToColor();
+                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(targetColor) });
                                 break;
                             case VisualKind.Player:
                                 playerPlaced = true;

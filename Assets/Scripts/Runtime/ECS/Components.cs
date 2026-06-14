@@ -12,6 +12,9 @@ namespace Sokoban
     public struct Player : IComponentData { } // tag：唯一玩家
     public struct Box : IComponentData { }    // tag：箱子
 
+    /// <summary>箱子属性：0=A（绿）1=B（紫）。须停在同属性目标格才算满足。</summary>
+    public struct BoxKind : IComponentData { public byte Value; }
+
     /// <summary>平滑移动动画：在 Duration 内把 LocalTransform.Position 从 From 插值到 To。</summary>
     public struct MoveAnimation : IComponentData
     {
@@ -43,7 +46,8 @@ namespace Sokoban
     public static class GridFlags
     {
         public const byte Wall = 1 << 0;
-        public const byte Target = 1 << 1;
+        public const byte TargetA = 1 << 1; // 目标A（绿）
+        public const byte TargetB = 1 << 2; // 目标B（紫）
     }
 
     /// <summary>本帧的移动指令（由输入系统写，移动系统消费）。</summary>

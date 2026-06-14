@@ -201,18 +201,24 @@ namespace Sokoban.Editor
 
         private static readonly (CellType type, string label)[] Brushes =
         {
-            (CellType.Wall, "墙"), (CellType.Target, "目标"),
-            (CellType.Box, "箱子"), (CellType.Player, "玩家"),
+            (CellType.Wall, "墙"),
+            (CellType.Target, "目标A(绿)"), (CellType.TargetB, "目标B(紫)"),
+            (CellType.Box, "箱子A(绿)"), (CellType.BoxB, "箱子B(紫)"),
+            (CellType.Player, "玩家"),
             (CellType.Floor, "地板/橡皮"),
         };
 
         private void DrawPlayabilityBar(LevelAsset lvl)
         {
-            int boxes = lvl.CountBoxes(), targets = lvl.CountTargets(), players = lvl.CountPlayers();
-            EditorGUILayout.LabelField($"尺寸 {lvl.Width}×{lvl.Height}      箱子 {boxes} / 目标 {targets} / 玩家 {players}");
+            int boxesA = lvl.CountBoxesA(), targetsA = lvl.CountTargetsA();
+            int boxesB = lvl.CountBoxesB(), targetsB = lvl.CountTargetsB();
+            int players = lvl.CountPlayers();
+            EditorGUILayout.LabelField(
+                $"尺寸 {lvl.Width}×{lvl.Height}      A 箱{boxesA}/目标{targetsA}   B 箱{boxesB}/目标{targetsB}   玩家 {players}");
 
-            string reason = boxes == 0 ? "没有箱子"
-                          : boxes != targets ? "箱数 ≠ 目标数"
+            string reason = (boxesA + boxesB) == 0 ? "没有箱子"
+                          : boxesA != targetsA ? "A(绿) 箱数 ≠ 目标数"
+                          : boxesB != targetsB ? "B(紫) 箱数 ≠ 目标数"
                           : players != 1 ? "玩家数应恰为 1"
                           : null;
             EditorGUILayout.HelpBox(reason == null ? "✓ 可玩" : "✗ " + reason,
@@ -300,8 +306,11 @@ namespace Sokoban.Editor
             {
                 if (i == keepIdx) continue;
                 var c = current[i];
-                // 清除该处玩家：在目标上则回到目标，否则回到地板。
-                lvl.cells[c.x, c.y] = lvl.cells[c.x, c.y].IsTarget() ? CellType.Target : CellType.Floor;
+                // 清除该处玩家：在目标上则回到对应属性目标（保留绿/紫），否则回到地板。
+                var here = lvl.cells[c.x, c.y];
+                lvl.cells[c.x, c.y] = here.IsTargetB() ? CellType.TargetB
+                                    : here.IsTargetA() ? CellType.Target
+                                    : CellType.Floor;
             }
         }
 

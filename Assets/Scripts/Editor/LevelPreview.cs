@@ -43,15 +43,23 @@ namespace Sokoban.Editor
             return count;
         }
 
-        // 预览着色：与运行时 BoxColorSystem 等价——箱子在目标上显示绿色，其余用各自基础色。
+        // 预览着色：与运行时 BoxColorSystem 等价——按属性（A 绿 / B 紫）取色，箱在匹配目标上提亮。
         private static Color ColorFor(VisualKind kind, CellType cell) => kind switch
         {
             VisualKind.Wall => CellType.Wall.ToColor(),
             VisualKind.Floor => CellType.Floor.ToColor(),
-            VisualKind.Target => CellType.Target.ToColor(),
-            VisualKind.Box => (cell == CellType.BoxOnTarget ? CellType.BoxOnTarget : CellType.Box).ToColor(),
+            VisualKind.Target => (cell.TargetKindOf() == 1 ? CellType.TargetB : CellType.Target).ToColor(),
+            VisualKind.Box => BoxColor(cell),
             VisualKind.Player => CellType.Player.ToColor(),
             _ => Color.gray,
+        };
+
+        private static Color BoxColor(CellType cell) => cell switch
+        {
+            CellType.BoxOnTarget => CellType.BoxOnTarget.ToColor(),
+            CellType.BoxBOnTarget => CellType.BoxBOnTarget.ToColor(),
+            CellType.BoxB => CellType.BoxB.ToColor(),
+            _ => CellType.Box.ToColor(),
         };
 
         public static void Clear()
