@@ -60,6 +60,7 @@ namespace Sokoban
             em.AddComponentData(singleton, new RespawnRequest { Value = true }); // 触发首关生成
             em.AddBuffer<GridCell>(singleton);
             em.AddBuffer<UndoStep>(singleton);
+            em.AddBuffer<UndoEntry>(singleton);
             em.AddComponentObject(singleton, new RenderResources
             {
                 CubeMesh = mesh,

@@ -85,31 +85,48 @@ namespace Sokoban
             foreach (var (gp, ent) in SystemAPI.Query<RefRO<GridPosition>>().WithAll<Box>().WithEntityAccess())
                 boxMap.TryAdd(gp.ValueRO.Value, ent);
 
-            float duration = SystemAPI.ManagedAPI.TryGetSingleton<RenderResources>(out var res) ? res.MoveDuration : 0.12f;
-            var undo = EntityManager.GetBuffer<UndoStep>(singleton);
+            // 静态层快照：后续 Animate(加 MoveAnimation) 是结构性变更，会让 grid/undo 缓冲句柄失效；
+            // 故墙/目标位先拷进 NativeArray，撤销明细先攒进 NativeList，全部结构性变更完成后再落盘。
+            var flags = new NativeArray<byte>(W * H, Allocator.Temp);
+            for (int i = 0; i < flags.Length; i++) flags[i] = grid[i].Flags;
 
+            float duration = SystemAPI.ManagedAPI.TryGetSingleton<RenderResources>(out var res) ? res.MoveDuration : 0.12f;
+            var stepEntries = new NativeList<UndoEntry>(Allocator.Temp);
+
+            Entity pushedBox = Entity.Null;
             if (boxMap.TryGetValue(next, out var boxEntity))
             {
                 int2 beyond = next + dir;
-                if (IsWall(grid, W, H, beyond) || boxMap.ContainsKey(beyond))
+                if (IsLocked(boxEntity) || IsWall(flags, W, H, beyond) || boxMap.ContainsKey(beyond))
                 {
+                    flags.Dispose();
+                    stepEntries.Dispose();
                     boxMap.Dispose();
-                    return; // 箱子前方被挡，不能推
+                    return; // 箱子被锁定(湮灭墙)或前方被挡，不能推
                 }
 
-                undo.Add(new UndoStep { Player = playerPos, Box = boxEntity, BoxFrom = next, HasBox = true });
+                stepEntries.Add(new UndoEntry { Box = boxEntity, From = next, RevertArrival = false });
+                boxMap.Remove(next);
+                boxMap.Add(beyond, boxEntity);
                 EntityManager.SetComponentData(boxEntity, new GridPosition { Value = beyond });
                 Animate(boxEntity, beyond, duration);
-                EntityManager.SetComponentData(playerEntity, new GridPosition { Value = next });
-                Animate(playerEntity, next, duration);
+                TryLockHavoc(boxEntity, flags, W, H, stepEntries); // 推上湮灭目标即锁定
+                pushedBox = boxEntity;
             }
-            else
-            {
-                undo.Add(new UndoStep { Player = playerPos, HasBox = false });
-                EntityManager.SetComponentData(playerEntity, new GridPosition { Value = next });
-                Animate(playerEntity, next, duration);
-            }
+            EntityManager.SetComponentData(playerEntity, new GridPosition { Value = next });
+            Animate(playerEntity, next, duration);
 
+            // 气动爆发（含连锁）：唯一可能的初始「到达」就是被玩家推动的那个箱子。
+            ResolveAeroBursts(boxMap, flags, W, H, next, duration, stepEntries, pushedBox);
+
+            // 结构性变更已全部完成，重新取撤销缓冲落盘（先明细后步，二者 LIFO 配套弹出）。
+            var undoEntries = EntityManager.GetBuffer<UndoEntry>(singleton);
+            for (int i = 0; i < stepEntries.Length; i++) undoEntries.Add(stepEntries[i]);
+            var undoSteps = EntityManager.GetBuffer<UndoStep>(singleton);
+            undoSteps.Add(new UndoStep { Player = playerPos, BoxCount = stepEntries.Length });
+
+            flags.Dispose();
+            stepEntries.Dispose();
             boxMap.Dispose();
 
             // 结构性变更已完成，重新获取单例 RW 再写状态。
@@ -118,18 +135,104 @@ namespace Sokoban
             stateRW.ValueRW.Animating = true;
         }
 
+        private static readonly int2[] Dirs = { new int2(1, 0), new int2(-1, 0), new int2(0, 1), new int2(0, -1) };
+
+        /// <summary>
+        /// 气动箱首次到达匹配(气动/A)目标 → 把四邻箱子各向外推一格；外一格被墙/箱子/玩家挡住则该箱不动。
+        /// 被推走的箱子若又是气动箱且落到自己目标 → 入队连锁爆发（Triggered 保证每箱仅爆一次，故必然终止）。
+        /// </summary>
+        private void ResolveAeroBursts(NativeHashMap<int2, Entity> boxMap, NativeArray<byte> flags,
+            int W, int H, int2 playerCell, float duration, NativeList<UndoEntry> stepEntries, Entity seed)
+        {
+            var queue = new NativeQueue<Entity>(Allocator.Temp);
+            if (IsAeroArrival(seed, flags, W, H))
+                queue.Enqueue(seed);
+
+            while (queue.TryDequeue(out var center))
+            {
+                if (!IsAeroArrival(center, flags, W, H))
+                    continue; // 可能已被先前的爆发推离目标
+                int2 c = EntityManager.GetComponentData<GridPosition>(center).Value;
+
+                EntityManager.SetComponentData(center, new AeroState { Triggered = true });
+                stepEntries.Add(new UndoEntry { Box = center, From = c, RevertArrival = true });
+
+                foreach (var d in Dirs)
+                {
+                    int2 nb = c + d;
+                    if (!boxMap.TryGetValue(nb, out var b))
+                        continue;
+                    if (IsLocked(b))
+                        continue; // 锁定的湮灭箱等同墙，推不动
+                    int2 dest = nb + d;
+                    if (IsWall(flags, W, H, dest) || boxMap.ContainsKey(dest) || math.all(dest == playerCell))
+                        continue; // 外一格被挡 → 该箱不动
+                    stepEntries.Add(new UndoEntry { Box = b, From = nb, RevertArrival = false });
+                    boxMap.Remove(nb);
+                    boxMap.Add(dest, b);
+                    EntityManager.SetComponentData(b, new GridPosition { Value = dest });
+                    Animate(b, dest, duration);
+                    TryLockHavoc(b, flags, W, H, stepEntries); // 被推上湮灭目标即锁定（同链后续视其为墙）
+                    if (IsAeroArrival(b, flags, W, H))
+                        queue.Enqueue(b);
+                }
+            }
+            queue.Dispose();
+        }
+
+        // 气动箱(持 AeroState)、未触发、且当前格带气动(A)目标位 → 视为「首次到达」。
+        private bool IsAeroArrival(Entity e, NativeArray<byte> flags, int W, int H)
+        {
+            if (e == Entity.Null || !EntityManager.HasComponent<AeroState>(e)) return false;
+            if (EntityManager.GetComponentData<AeroState>(e).Triggered) return false;
+            int2 p = EntityManager.GetComponentData<GridPosition>(e).Value;
+            if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) return false;
+            return (flags[p.y * W + p.x] & GridFlags.TargetA) != 0;
+        }
+
+        // 湮灭箱已锁定 → 等同墙：玩家与气动爆发都推不动它。
+        private bool IsLocked(Entity e) =>
+            EntityManager.HasComponent<HavocState>(e) && EntityManager.GetComponentData<HavocState>(e).Locked;
+
+        // 湮灭箱(持 HavocState)未锁定、且当前格带湮灭(B)目标位 → 锁定为不可推动，并记一条可撤销翻转。
+        private void TryLockHavoc(Entity e, NativeArray<byte> flags, int W, int H, NativeList<UndoEntry> stepEntries)
+        {
+            if (!EntityManager.HasComponent<HavocState>(e)) return;
+            if (EntityManager.GetComponentData<HavocState>(e).Locked) return;
+            int2 p = EntityManager.GetComponentData<GridPosition>(e).Value;
+            if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) return;
+            if ((flags[p.y * W + p.x] & GridFlags.TargetB) == 0) return;
+            EntityManager.SetComponentData(e, new HavocState { Locked = true });
+            stepEntries.Add(new UndoEntry { Box = e, From = p, RevertArrival = true });
+        }
+
+        // 幂等：一步内同一箱可能被玩家推、再被爆发推；重复调用只更新终点，保留原始 From/Elapsed，避免重复 AddComponent。
         private void Animate(Entity e, int2 toCell, float duration)
         {
             var lt = EntityManager.GetComponentData<LocalTransform>(e);
-            float3 from = lt.Position;
-            float3 to = LevelSpawnSystem.CellToWorld(toCell, from.y);
-            EntityManager.AddComponentData(e, new MoveAnimation { From = from, To = to, Duration = duration, Elapsed = 0f });
+            float3 to = LevelSpawnSystem.CellToWorld(toCell, lt.Position.y);
+            if (EntityManager.HasComponent<MoveAnimation>(e))
+            {
+                var anim = EntityManager.GetComponentData<MoveAnimation>(e);
+                anim.To = to;
+                EntityManager.SetComponentData(e, anim);
+            }
+            else
+            {
+                EntityManager.AddComponentData(e, new MoveAnimation { From = lt.Position, To = to, Duration = duration, Elapsed = 0f });
+            }
         }
 
         public static bool IsWall(DynamicBuffer<GridCell> grid, int w, int h, int2 c)
         {
             if (c.x < 0 || c.x >= w || c.y < 0 || c.y >= h) return true;
             return (grid[c.y * w + c.x].Flags & GridFlags.Wall) != 0;
+        }
+
+        public static bool IsWall(NativeArray<byte> flags, int w, int h, int2 c)
+        {
+            if (c.x < 0 || c.x >= w || c.y < 0 || c.y >= h) return true;
+            return (flags[c.y * w + c.x] & GridFlags.Wall) != 0;
         }
     }
 
@@ -289,24 +392,46 @@ namespace Sokoban
         private void DoUndo()
         {
             var singleton = SystemAPI.GetSingletonEntity<GameState>();
-            var undo = EntityManager.GetBuffer<UndoStep>(singleton);
-            if (undo.Length == 0)
+            var steps = EntityManager.GetBuffer<UndoStep>(singleton);
+            if (steps.Length == 0)
                 return;
 
-            UndoStep step = undo[undo.Length - 1];
-            undo.RemoveAt(undo.Length - 1);
+            UndoStep step = steps[steps.Length - 1];
+            steps.RemoveAt(steps.Length - 1);
             int movesBefore = SystemAPI.GetSingleton<GameState>().Moves;
+
+            // 先把本步明细（缓冲末尾 BoxCount 条）弹入临时表，再做 Snap——
+            // Snap 移除 MoveAnimation 是结构性变更，会让 UndoEntry 缓冲句柄失效。
+            var entries = EntityManager.GetBuffer<UndoEntry>(singleton);
+            var toRestore = new NativeList<UndoEntry>(Allocator.Temp);
+            int n = math.min(step.BoxCount, entries.Length);
+            for (int i = 0; i < n; i++)
+            {
+                toRestore.Add(entries[entries.Length - 1]);
+                entries.RemoveAt(entries.Length - 1);
+            }
+
+            // 按 LIFO 还原：同一箱在本步若移动多次，最后落定的是其步初位置；RevertArrival 同时清气动触发/湮灭锁定标志。
+            foreach (var en in toRestore)
+            {
+                if (!EntityManager.Exists(en.Box)) continue;
+                EntityManager.SetComponentData(en.Box, new GridPosition { Value = en.From });
+                Snap(en.Box, en.From);
+                if (en.RevertArrival)
+                {
+                    if (EntityManager.HasComponent<AeroState>(en.Box))
+                        EntityManager.SetComponentData(en.Box, new AeroState { Triggered = false });
+                    if (EntityManager.HasComponent<HavocState>(en.Box))
+                        EntityManager.SetComponentData(en.Box, new HavocState { Locked = false });
+                }
+            }
+            toRestore.Dispose();
 
             // Snap 内部可能移除 MoveAnimation（结构性变更），故状态写入推迟到最后重新获取 RW。
             if (SystemAPI.TryGetSingletonEntity<Player>(out var playerEntity))
             {
                 EntityManager.SetComponentData(playerEntity, new GridPosition { Value = step.Player });
                 Snap(playerEntity, step.Player);
-            }
-            if (step.HasBox && EntityManager.Exists(step.Box))
-            {
-                EntityManager.SetComponentData(step.Box, new GridPosition { Value = step.BoxFrom });
-                Snap(step.Box, step.BoxFrom);
             }
 
             var stateRW = SystemAPI.GetSingletonRW<GameState>();

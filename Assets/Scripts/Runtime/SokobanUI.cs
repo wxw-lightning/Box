@@ -11,12 +11,14 @@ namespace Sokoban
     public class SokobanUI : MonoBehaviour
     {
         private Text _infoText;
+        private Text _hintText;
         private GameObject _winPanel;
         private Font _font;
 
         private EntityManager _em;
         private EntityQuery _stateQuery;
         private EntityQuery _ctrlQuery;
+        private EntityQuery _resQuery;
         private bool _worldReady;
 
         // 缓存上次显示的状态，避免每帧重建信息字符串（GC）/重复刷新面板。
@@ -39,6 +41,7 @@ namespace Sokoban
             _em = world.EntityManager;
             _stateQuery = _em.CreateEntityQuery(typeof(GameState));
             _ctrlQuery = _em.CreateEntityQuery(typeof(ControlRequest));
+            _resQuery = _em.CreateEntityQuery(typeof(RenderResources));
             _worldReady = true;
             return true;
         }
@@ -50,7 +53,9 @@ namespace Sokoban
 
             var state = _stateQuery.GetSingleton<GameState>();
 
-            if (state.LevelIndex != _lastLevelIndex ||
+            bool levelChanged = state.LevelIndex != _lastLevelIndex;
+
+            if (levelChanged ||
                 state.LevelCount != _lastLevelCount ||
                 state.Moves != _lastMoves)
             {
@@ -58,14 +63,27 @@ namespace Sokoban
                 _lastLevelCount = state.LevelCount;
                 _lastMoves = state.Moves;
                 _infoText.text = $"关卡 {state.LevelIndex + 1}/{state.LevelCount}    步数 {state.Moves}\n" +
-                                 "方向键/WASD 移动   U 撤销   R 重玩   N/P 切关";
+                                 "方向键/WASD 移动   U 撤销   R 重玩   N 下一关 P 前一关";
             }
+
+            // 提示文字仅随关卡切换变化，不必每帧重建。
+            if (levelChanged)
+                _hintText.text = GetLevelHint(state.LevelIndex);
 
             if (state.Won != _lastWon)
             {
                 _lastWon = state.Won;
                 _winPanel.SetActive(state.Won);
             }
+        }
+
+        /// <summary>从托管单例 <see cref="RenderResources"/> 的关卡数据库取该关教学提示（纯文本）。</summary>
+        private string GetLevelHint(int levelIndex)
+        {
+            if (_resQuery.IsEmptyIgnoreFilter) return "";
+            var res = _em.GetComponentObject<RenderResources>(_resQuery.GetSingletonEntity());
+            var level = res?.Db != null ? res.Db.Get(levelIndex) : null;
+            return level != null ? level.hint ?? "" : "";
         }
 
         // ---------- 按钮 → 写 ControlRequest ----------
@@ -100,6 +118,17 @@ namespace Sokoban
             infoRt.pivot = new Vector2(0f, 1f);
             infoRt.anchoredPosition = new Vector2(12f, -8f);
             infoRt.sizeDelta = new Vector2(-24f, 60f);
+
+            // 教学提示：信息栏下方，淡黄色多行自动换行。空串则不占视觉空间。
+            _hintText = CreateText(canvasGo.transform, "Hint", 20, TextAnchor.UpperLeft,
+                new Color(1f, 0.92f, 0.55f));
+            _hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            var hintRt = _hintText.rectTransform;
+            hintRt.anchorMin = new Vector2(0f, 1f);
+            hintRt.anchorMax = new Vector2(1f, 1f);
+            hintRt.pivot = new Vector2(0f, 1f);
+            hintRt.anchoredPosition = new Vector2(12f, -72f);
+            hintRt.sizeDelta = new Vector2(-24f, 120f);
 
             // 底部按钮行。
             CreateButton(canvasGo.transform, "重玩 (R)", new Vector2(-120f, 30f), SendReset);

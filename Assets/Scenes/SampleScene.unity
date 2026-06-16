@@ -411,7 +411,7 @@ MonoBehaviour:
   floorMaterial: {fileID: 2100000, guid: c342d7dcc01d1b0408436a4a931e4592, type: 2}
   wallMaterial: {fileID: 2100000, guid: fe31989be52cf434180be229d796b1dc, type: 2}
   targetMaterial: {fileID: 2100000, guid: a6d68ecd68b99c44ea50b4ac69ed2837, type: 2}
-  boxMaterial: {fileID: 2100000, guid: 28d79f50707648046aad5a3a309ca47e, type: 2}
+  boxMaterial: {fileID: 2100000, guid: c342d7dcc01d1b0408436a4a931e4592, type: 2}
   playerMaterial: {fileID: 2100000, guid: b431b1c7065d4334cae94d2b91692d7f, type: 2}
   startLevel: 0
   moveDuration: 0.12

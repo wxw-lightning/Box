@@ -4,9 +4,9 @@ namespace Sokoban
 {
     /// <summary>
     /// 单个格子的内容（对应经典 Sokoban 符号）。用单枚举便于 Odin TableMatrix 点击绘制。
-    /// 双属性：A 系=绿（沿用 Target/Box 旧值），B 系=紫（TargetB/BoxB）。每个箱子需停在同属性目标才算过关。
-    /// Floor 地板 / Wall 墙 / Target 目标A / Box 箱子A / BoxOnTarget A箱在A目标 /
-    /// Player 玩家 / PlayerOnTarget 玩家在目标 / TargetB 目标B / BoxB 箱子B / BoxBOnTarget B箱在B目标。
+    /// 双属性（鸣潮元素主题）：A 系=气动(绿)（沿用 Target/Box 旧值），B 系=湮灭(紫)（TargetB/BoxB）。每个箱子需停在同属性目标才算过关。
+    /// Floor 地板 / Wall 墙 / Target 气动目标 / Box 气动箱 / BoxOnTarget 气动箱在气动目标 /
+    /// Player 玩家 / PlayerOnTarget 玩家在目标 / TargetB 湮灭目标 / BoxB 湮灭箱 / BoxBOnTarget 湮灭箱锁定(在湮灭目标，已不可推动)。
     /// </summary>
     public enum CellType : byte
     {
@@ -80,8 +80,8 @@ namespace Sokoban
                 case CellType.Box: return new Color(0.30f, 0.72f, 0.42f);      // 箱子A 绿
                 case CellType.BoxOnTarget: return Satisfied(new Color(0.30f, 0.72f, 0.42f));
                 case CellType.TargetB: return new Color(0.55f, 0.42f, 0.72f);  // 目标B 紫（暗）
-                case CellType.BoxB: return new Color(0.62f, 0.40f, 0.85f);     // 箱子B 紫
-                case CellType.BoxBOnTarget: return Satisfied(new Color(0.62f, 0.40f, 0.85f));
+                case CellType.BoxB: return new Color(0.62f, 0.40f, 0.85f);     // 湮灭箱 紫
+                case CellType.BoxBOnTarget: return new Color(0.40f, 0.30f, 0.50f); // 湮灭箱锁定：暗紫，示意已变为不可推动的墙
                 case CellType.Player: return new Color(0.27f, 0.55f, 0.92f);
                 case CellType.PlayerOnTarget: return new Color(0.45f, 0.70f, 0.95f);
                 default: return new Color(0.82f, 0.82f, 0.82f); // Floor

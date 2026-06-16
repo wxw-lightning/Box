@@ -15,6 +15,12 @@ namespace Sokoban
     /// <summary>箱子属性：0=A（绿）1=B（紫）。须停在同属性目标格才算满足。</summary>
     public struct BoxKind : IComponentData { public byte Value; }
 
+    /// <summary>气动箱（BoxKind 0）状态：首次到达匹配目标会爆发推开四邻箱子一格，仅触发一次（Triggered）。</summary>
+    public struct AeroState : IComponentData { public bool Triggered; }
+
+    /// <summary>湮灭箱（BoxKind 1）状态：首次到达匹配目标后锁定为不可推动（Locked，等同墙）。</summary>
+    public struct HavocState : IComponentData { public bool Locked; }
+
     /// <summary>平滑移动动画：在 Duration 内把 LocalTransform.Position 从 From 插值到 To。</summary>
     public struct MoveAnimation : IComponentData
     {
@@ -64,13 +70,20 @@ namespace Sokoban
     /// <summary>置 true 触发 LevelSpawnSystem 重建当前关卡。</summary>
     public struct RespawnRequest : IComponentData { public bool Value; }
 
-    /// <summary>撤销栈元素。</summary>
+    /// <summary>撤销栈：一次输入=一个 step；其涉及的箱子移动/触发翻转记录在 <see cref="UndoEntry"/> 缓冲末尾 BoxCount 条，按 LIFO 弹出还原。</summary>
     public struct UndoStep : IBufferElementData
     {
-        public int2 Player;
+        public int2 Player;  // 该步前玩家位置
+        public int BoxCount; // 本步追加到 UndoEntry 的记录数
+    }
+
+    /// <summary>撤销明细：某步内一个箱子的一次位移/状态翻转。还原即把箱子 Snap 回 From；
+    /// RevertArrival 时同时清除该箱的「首次到达」状态（气动 Triggered / 湮灭 Locked）。</summary>
+    public struct UndoEntry : IBufferElementData
+    {
         public Entity Box;
-        public int2 BoxFrom;
-        public bool HasBox;
+        public int2 From;
+        public bool RevertArrival;
     }
 
     /// <summary>

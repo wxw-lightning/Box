@@ -85,8 +85,9 @@ namespace Sokoban
                 }
             }
 
-            // 清空撤销栈。
+            // 清空撤销栈（步 + 明细）。
             em.GetBuffer<UndoStep>(singleton).Clear();
+            em.GetBuffer<UndoEntry>(singleton).Clear();
 
             // 共享渲染数据（一份 RenderMeshArray，5 材质 + 1 网格，利于批处理）。
             var materials = new Material[] { res.Floor, res.Wall, res.Target, res.BoxMat, res.PlayerMat };
@@ -120,6 +121,12 @@ namespace Sokoban
                                 em.AddComponentData(e, new GridPosition { Value = cell });
                                 em.AddComponent<Box>(e);
                                 em.AddComponentData(e, new BoxKind { Value = boxKind });
+                                // 气动箱携带触发状态；若出生即在匹配目标上，视为已触发（不爆发）。
+                                if (boxKind == 0)
+                                    em.AddComponentData(e, new AeroState { Triggered = c.IsTargetA() });
+                                // 湮灭箱携带锁定状态；若出生即在匹配目标上，视为已锁定（直接不可推动）。
+                                else
+                                    em.AddComponentData(e, new HavocState { Locked = c.IsTargetB() });
                                 var boxColor = (boxKind == 1 ? CellType.BoxB : CellType.Box).ToColor();
                                 em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(boxColor) });
                                 break;

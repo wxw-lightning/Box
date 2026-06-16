@@ -17,6 +17,12 @@ namespace Sokoban
         [HideInInspector]
         public string levelName = "新关卡";
 
+        // 教学/提示文字（纯文本，可多行），运行时显示在关卡 UI 上。空串表示本关无提示。
+        // 由编辑器窗口的「教学提示」文本域渲染，这里从默认 Inspector 隐藏避免重复。
+        [HideInInspector]
+        [TextArea(2, 5)]
+        public string hint = "";
+
         // 网格由编辑器窗口用固定像素尺寸自绘（见 LevelEditorWindow.DrawGridSection），
         // 不用 Odin TableMatrix（其 SquareCells 会按可用宽度缩放、忽略 RowHeight）。
         // 这里从默认 Inspector 隐藏，仅保留 Odin 序列化到 .asset。
@@ -57,6 +63,7 @@ namespace Sokoban
         public void CopyFrom(LevelAsset other)
         {
             levelName = other.levelName;
+            hint = other.hint;
             cells = (CellType[,])other.cells.Clone();
         }
 

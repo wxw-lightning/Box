@@ -114,6 +114,18 @@ namespace Sokoban.Editor
             }
             EditorGUILayout.EndHorizontal();
 
+            // 教学/提示：纯文本多行，运行时显示在关卡 UI 上。不影响左侧菜单，故无需重建树。
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("教学提示", GUILayout.Width(48));
+            string newHint = EditorGUILayout.TextArea(selected.hint ?? "",
+                EditorStyles.textArea, GUILayout.MinHeight(48));
+            if (newHint != selected.hint)
+            {
+                selected.hint = newHint;
+                EditorUtility.SetDirty(selected);
+            }
+            EditorGUILayout.EndHorizontal();
+
             // 实时可玩性指示（取代弹窗校验 + 大段只读统计）。
             DrawPlayabilityBar(selected);
 
@@ -202,8 +214,8 @@ namespace Sokoban.Editor
         private static readonly (CellType type, string label)[] Brushes =
         {
             (CellType.Wall, "墙"),
-            (CellType.Target, "目标A(绿)"), (CellType.TargetB, "目标B(紫)"),
-            (CellType.Box, "箱子A(绿)"), (CellType.BoxB, "箱子B(紫)"),
+            (CellType.Target, "气动目标"), (CellType.TargetB, "湮灭目标"),
+            (CellType.Box, "气动箱"), (CellType.BoxB, "湮灭箱"),
             (CellType.Player, "玩家"),
             (CellType.Floor, "地板/橡皮"),
         };
@@ -214,11 +226,11 @@ namespace Sokoban.Editor
             int boxesB = lvl.CountBoxesB(), targetsB = lvl.CountTargetsB();
             int players = lvl.CountPlayers();
             EditorGUILayout.LabelField(
-                $"尺寸 {lvl.Width}×{lvl.Height}      A 箱{boxesA}/目标{targetsA}   B 箱{boxesB}/目标{targetsB}   玩家 {players}");
+                $"尺寸 {lvl.Width}×{lvl.Height}      气动 箱{boxesA}/目标{targetsA}   湮灭 箱{boxesB}/目标{targetsB}   玩家 {players}");
 
             string reason = (boxesA + boxesB) == 0 ? "没有箱子"
-                          : boxesA != targetsA ? "A(绿) 箱数 ≠ 目标数"
-                          : boxesB != targetsB ? "B(紫) 箱数 ≠ 目标数"
+                          : boxesA != targetsA ? "气动箱数 ≠ 目标数"
+                          : boxesB != targetsB ? "湮灭箱数 ≠ 目标数"
                           : players != 1 ? "玩家数应恰为 1"
                           : null;
             EditorGUILayout.HelpBox(reason == null ? "✓ 可玩" : "✗ " + reason,
@@ -372,6 +384,8 @@ namespace Sokoban.Editor
             int i = _db.levels.IndexOf(src);
             var copy = CreateLevelAsset(src.name + "_Copy",
                 (CellType[,])src.cells.Clone(), src.levelName + " Copy");
+            copy.hint = src.hint;
+            EditorUtility.SetDirty(copy);
             _db.levels.Insert(i + 1, copy);
             EditorUtility.SetDirty(_db);
             AssetDatabase.SaveAssets();
