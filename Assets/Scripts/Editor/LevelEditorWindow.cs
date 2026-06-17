@@ -26,6 +26,26 @@ namespace Sokoban.Editor
         private bool _autoPreview = true;
         private LevelAsset _lastSelected;
 
+        // 撤销栈：每次结构性修改（绘格/调整尺寸/填充/清空）前快照 cells，撤销时还原最近一步。
+        // 仅针对当前所选关卡，切换关卡时清空（见 HandleSelectionChange）。
+        private const int MaxUndo = 50;
+        private readonly List<UndoSnapshot> _undoStack = new List<UndoSnapshot>();
+
+        /// <summary>一步撤销快照：记录归属关卡与修改前的 cells 副本。</summary>
+        private readonly struct UndoSnapshot
+        {
+            public readonly LevelAsset Asset;
+            public readonly CellType[,] Cells;
+            public UndoSnapshot(LevelAsset asset, CellType[,] cells) { Asset = asset; Cells = cells; }
+        }
+
+        // 可解性检测（手动按钮触发，见 DrawSolverBar）。结果缓存；关卡被结构性修改或切换关卡后置 stale。
+        // 搜索预算，上限保证编辑器不被复杂关卡卡死（见 LevelSolver）。
+        private const int SolverMaxStates = 200000;
+        private const double SolverMaxSeconds = 2.0;
+        private LevelSolver.SolveResult? _solveResult;
+        private bool _solverStale = true;
+
         [MenuItem("Tools/Sokoban/Level Editor")]
         private static void Open()
         {
@@ -62,6 +82,15 @@ namespace Sokoban.Editor
         {
             var selected = MenuTree?.Selection?.SelectedValue as LevelAsset;
             HandleSelectionChange(selected);
+
+            // Ctrl/Cmd+Z 撤销；编辑文本框（关卡名/提示）时让文本框自行处理，不拦截。
+            var hotkey = Event.current;
+            if (hotkey.type == EventType.KeyDown && hotkey.keyCode == KeyCode.Z
+                && (hotkey.control || hotkey.command) && !EditorGUIUtility.editingTextField)
+            {
+                Undo();
+                hotkey.Use();
+            }
 
             // 顶部：自动预览开关 + 列表级操作。
             SirenixEditorGUI.BeginHorizontalToolbar();
@@ -145,10 +174,16 @@ namespace Sokoban.Editor
             _newHeight = Mathf.Max(1, EditorGUILayout.IntField(_newHeight, GUILayout.Width(38)));
             if (SirenixEditorGUI.ToolbarButton(new GUIContent("调整尺寸")))
             {
+                PushUndo(selected);
                 selected.Resize(_newWidth, _newHeight);
                 MarkAndPreview(selected);
             }
             GUILayout.FlexibleSpace();
+            using (new EditorGUI.DisabledScope(_undoStack.Count == 0))
+            {
+                if (SirenixEditorGUI.ToolbarButton(new GUIContent($"撤销 Ctrl+Z ({_undoStack.Count})")))
+                    Undo();
+            }
             SirenixEditorGUI.EndHorizontalToolbar();
 
             GUILayout.Space(6);
@@ -177,6 +212,8 @@ namespace Sokoban.Editor
                     if ((e.type == EventType.MouseDown || e.type == EventType.MouseDrag)
                         && e.button == 0 && r.Contains(e.mousePosition))
                     {
+                        if (e.type == EventType.MouseDown)
+                            PushUndo(lvl); // 一次落笔=一步撤销（拖动连画归为同一步）
                         lvl.cells[col, row] = LevelEditing.Brush;
                         painted = true;
                         e.Use();
@@ -235,8 +272,62 @@ namespace Sokoban.Editor
                           : boxesC != targetsC ? "衍射箱数 ≠ 目标数"
                           : players != 1 ? "玩家数应恰为 1"
                           : null;
-            EditorGUILayout.HelpBox(reason == null ? "✓ 可玩" : "✗ " + reason,
+            EditorGUILayout.HelpBox(reason == null ? "✓ 可玩（数量配平）" : "✗ " + reason,
                 reason == null ? MessageType.Info : MessageType.Error);
+
+            // 真实可解性：数量配平只是必要条件，下面用求解器判断是否「确实有解」。
+            DrawSolverBar(lvl, basicValid: reason == null);
+        }
+
+        // 可解性检测 UI：按钮触发求解，结果三态缓存显示。仅在数量/玩家预检通过时可用。
+        private void DrawSolverBar(LevelAsset lvl, bool basicValid)
+        {
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(!basicValid))
+            {
+                if (GUILayout.Button("检测是否可解", GUILayout.Width(110)))
+                    RunSolver(lvl);
+            }
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+
+            if (!basicValid)
+                return; // 先修数量/玩家配平，再谈可解性
+
+            if (_solverStale || _solveResult == null)
+            {
+                EditorGUILayout.HelpBox("○ 尚未检测可解性（点击「检测是否可解」）", MessageType.None);
+                return;
+            }
+
+            var r = _solveResult.Value;
+            switch (r.Status)
+            {
+                case LevelSolver.Solvability.Solvable:
+                    EditorGUILayout.HelpBox($"✓ 确实有解（最少 {r.Moves} 步）", MessageType.Info);
+                    break;
+                case LevelSolver.Solvability.Unsolvable:
+                    EditorGUILayout.HelpBox($"✗ 无解（已穷尽 {r.StatesExplored} 个状态，无可行解法）", MessageType.Error);
+                    break;
+                default:
+                    EditorGUILayout.HelpBox(
+                        $"? 无法判定：超出搜索上限（已搜 {r.StatesExplored} 状态），建议简化关卡后重试", MessageType.Warning);
+                    break;
+            }
+        }
+
+        private void RunSolver(LevelAsset lvl)
+        {
+            try
+            {
+                EditorUtility.DisplayProgressBar("可解性检测", "正在搜索可行解法…", 0.5f);
+                _solveResult = LevelSolver.Analyze(lvl, SolverMaxStates, SolverMaxSeconds);
+                _solverStale = false;
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
         }
 
         private void DrawBrushBar()
@@ -265,6 +356,7 @@ namespace Sokoban.Editor
             if (GUILayout.Button("四周加墙", GUILayout.Width(80))) AddBorder(lvl);
             if (GUILayout.Button("清空", GUILayout.Width(70)))
             {
+                PushUndo(lvl);
                 lvl.cells = LevelAsset.CreateEmpty(lvl.Width, lvl.Height);
                 MarkAndPreview(lvl);
             }
@@ -274,6 +366,7 @@ namespace Sokoban.Editor
 
         private void FillAll(LevelAsset lvl, CellType t)
         {
+            PushUndo(lvl);
             for (int x = 0; x < lvl.Width; x++)
                 for (int y = 0; y < lvl.Height; y++)
                     lvl.cells[x, y] = t;
@@ -282,6 +375,7 @@ namespace Sokoban.Editor
 
         private void AddBorder(LevelAsset lvl)
         {
+            PushUndo(lvl);
             int W = lvl.Width, H = lvl.Height;
             for (int x = 0; x < W; x++) { lvl.cells[x, 0] = CellType.Wall; lvl.cells[x, H - 1] = CellType.Wall; }
             for (int y = 0; y < H; y++) { lvl.cells[0, y] = CellType.Wall; lvl.cells[W - 1, y] = CellType.Wall; }
@@ -293,6 +387,33 @@ namespace Sokoban.Editor
             EditorUtility.SetDirty(lvl);
             if (_autoPreview && LevelPreview.HasPreview)
                 LevelPreview.Generate(lvl);
+        }
+
+        // ---------- 撤销 ----------
+
+        /// <summary>在修改 <paramref name="lvl"/> 之前调用：把当前 cells 快照压栈。</summary>
+        private void PushUndo(LevelAsset lvl)
+        {
+            if (lvl == null || lvl.cells == null) return;
+            _undoStack.Add(new UndoSnapshot(lvl, (CellType[,])lvl.cells.Clone()));
+            if (_undoStack.Count > MaxUndo)
+                _undoStack.RemoveAt(0); // 超出上限丢弃最旧一步
+            _solverStale = true; // 任何结构性修改都使已缓存的可解性结果失效
+        }
+
+        /// <summary>还原最近一步修改。</summary>
+        private void Undo()
+        {
+            if (_undoStack.Count == 0) return;
+            var snap = _undoStack[_undoStack.Count - 1];
+            _undoStack.RemoveAt(_undoStack.Count - 1);
+            if (snap.Asset == null) return; // 关卡已被删除
+            snap.Asset.cells = snap.Cells;
+            EditorUtility.SetDirty(snap.Asset);
+            if (_autoPreview && LevelPreview.HasPreview)
+                LevelPreview.Generate(snap.Asset);
+            Repaint();
+            SceneView.RepaintAll();
         }
 
         // ---------- 维持「至多一个玩家」 ----------
@@ -334,6 +455,9 @@ namespace Sokoban.Editor
         {
             if (selected == _lastSelected) return;
             _lastSelected = selected;
+            _undoStack.Clear(); // 撤销历史按关卡隔离
+            _solveResult = null; // 可解性结果按关卡隔离
+            _solverStale = true;
             if (_autoPreview && selected != null)
             {
                 LevelPreview.Generate(selected);
