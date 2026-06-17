@@ -19,13 +19,16 @@ namespace Sokoban
 
         protected override void OnUpdate()
         {
+            var state = SystemAPI.GetSingleton<GameState>();
+            if (state.InLevelSelect)
+                return; // 选关界面屏蔽所有游戏内按键，选关由 UI 按钮驱动
+
             var ctrl = SystemAPI.GetSingletonRW<ControlRequest>();
             if (Input.GetKeyDown(KeyCode.R)) ctrl.ValueRW.Reset = true;
             if (Input.GetKeyDown(KeyCode.U)) ctrl.ValueRW.Undo = true;
             if (Input.GetKeyDown(KeyCode.N)) ctrl.ValueRW.LevelDelta = +1;
             if (Input.GetKeyDown(KeyCode.P)) ctrl.ValueRW.LevelDelta = -1;
 
-            var state = SystemAPI.GetSingleton<GameState>();
             if (state.Won || state.Animating)
                 return;
 
@@ -94,6 +97,7 @@ namespace Sokoban
             var stepEntries = new NativeList<UndoEntry>(Allocator.Temp);
 
             Entity pushedBox = Entity.Null;
+            int2 pushedDir = default;
             if (boxMap.TryGetValue(next, out var boxEntity))
             {
                 int2 beyond = next + dir;
@@ -105,19 +109,15 @@ namespace Sokoban
                     return; // 箱子被锁定(湮灭墙)或前方被挡，不能推
                 }
 
-                stepEntries.Add(new UndoEntry { Box = boxEntity, From = next, RevertArrival = false });
-                boxMap.Remove(next);
-                boxMap.Add(beyond, boxEntity);
-                EntityManager.SetComponentData(boxEntity, new GridPosition { Value = beyond });
-                Animate(boxEntity, beyond, duration);
-                TryLockHavoc(boxEntity, flags, W, H, stepEntries); // 推上湮灭目标即锁定
+                MoveBox(boxEntity, next, beyond, boxMap, stepEntries, duration);
                 pushedBox = boxEntity;
+                pushedDir = dir;
             }
             EntityManager.SetComponentData(playerEntity, new GridPosition { Value = next });
             Animate(playerEntity, next, duration);
 
-            // 气动爆发（含连锁）：唯一可能的初始「到达」就是被玩家推动的那个箱子。
-            ResolveAeroBursts(boxMap, flags, W, H, next, duration, stepEntries, pushedBox);
+            // 元素「首次到达」结算（含连锁）：初始到达就是被玩家推动的那个箱子，方向=推动方向。
+            ResolveArrivals(boxMap, flags, W, H, next, duration, stepEntries, pushedBox, pushedDir);
 
             // 结构性变更已全部完成，重新取撤销缓冲落盘（先明细后步，二者 LIFO 配套弹出）。
             var undoEntries = EntityManager.GetBuffer<UndoEntry>(singleton);
@@ -137,47 +137,94 @@ namespace Sokoban
 
         private static readonly int2[] Dirs = { new int2(1, 0), new int2(-1, 0), new int2(0, 1), new int2(0, -1) };
 
+        // 一次待结算的「到达」：箱子 + 其到达方向（衍射按此方向推；气动忽略方向）。
+        private struct Arrival { public Entity Box; public int2 Dir; }
+
         /// <summary>
-        /// 气动箱首次到达匹配(气动/A)目标 → 把四邻箱子各向外推一格；外一格被墙/箱子/玩家挡住则该箱不动。
-        /// 被推走的箱子若又是气动箱且落到自己目标 → 入队连锁爆发（Triggered 保证每箱仅爆一次，故必然终止）。
+        /// 元素「首次到达匹配目标」结算（FIFO，含跨元素连锁）：气动→四邻各向外推一格；衍射→沿到达方向整条射线各推一格；
+        /// 湮灭→在移动处即时锁定（见 <see cref="OnBoxArrived"/>）。被推动的箱子再次结算；Triggered/Locked 保证每箱仅一次、必然终止。
         /// </summary>
-        private void ResolveAeroBursts(NativeHashMap<int2, Entity> boxMap, NativeArray<byte> flags,
-            int W, int H, int2 playerCell, float duration, NativeList<UndoEntry> stepEntries, Entity seed)
+        private void ResolveArrivals(NativeHashMap<int2, Entity> boxMap, NativeArray<byte> flags,
+            int W, int H, int2 playerCell, float duration, NativeList<UndoEntry> stepEntries, Entity seed, int2 seedDir)
         {
-            var queue = new NativeQueue<Entity>(Allocator.Temp);
-            if (IsAeroArrival(seed, flags, W, H))
-                queue.Enqueue(seed);
+            var queue = new NativeQueue<Arrival>(Allocator.Temp);
+            if (seed != Entity.Null)
+                OnBoxArrived(seed, seedDir, flags, W, H, stepEntries, queue);
 
-            while (queue.TryDequeue(out var center))
+            while (queue.TryDequeue(out var arr))
             {
-                if (!IsAeroArrival(center, flags, W, H))
-                    continue; // 可能已被先前的爆发推离目标
-                int2 c = EntityManager.GetComponentData<GridPosition>(center).Value;
-
-                EntityManager.SetComponentData(center, new AeroState { Triggered = true });
-                stepEntries.Add(new UndoEntry { Box = center, From = c, RevertArrival = true });
-
-                foreach (var d in Dirs)
-                {
-                    int2 nb = c + d;
-                    if (!boxMap.TryGetValue(nb, out var b))
-                        continue;
-                    if (IsLocked(b))
-                        continue; // 锁定的湮灭箱等同墙，推不动
-                    int2 dest = nb + d;
-                    if (IsWall(flags, W, H, dest) || boxMap.ContainsKey(dest) || math.all(dest == playerCell))
-                        continue; // 外一格被挡 → 该箱不动
-                    stepEntries.Add(new UndoEntry { Box = b, From = nb, RevertArrival = false });
-                    boxMap.Remove(nb);
-                    boxMap.Add(dest, b);
-                    EntityManager.SetComponentData(b, new GridPosition { Value = dest });
-                    Animate(b, dest, duration);
-                    TryLockHavoc(b, flags, W, H, stepEntries); // 被推上湮灭目标即锁定（同链后续视其为墙）
-                    if (IsAeroArrival(b, flags, W, H))
-                        queue.Enqueue(b);
-                }
+                if (IsAeroArrival(arr.Box, flags, W, H))
+                    AeroBurst(arr.Box, boxMap, flags, W, H, playerCell, duration, stepEntries, queue);
+                else if (IsSpectroArrival(arr.Box, flags, W, H))
+                    SpectroBeam(arr.Box, arr.Dir, boxMap, flags, W, H, playerCell, duration, stepEntries, queue);
             }
             queue.Dispose();
+        }
+
+        // 气动爆发：四邻箱子各向外一格；被推走者再结算（连锁）。受阻(墙/箱/玩家/锁定箱)则该箱不动。
+        private void AeroBurst(Entity center, NativeHashMap<int2, Entity> boxMap, NativeArray<byte> flags,
+            int W, int H, int2 playerCell, float duration, NativeList<UndoEntry> stepEntries, NativeQueue<Arrival> queue)
+        {
+            int2 c = EntityManager.GetComponentData<GridPosition>(center).Value;
+            EntityManager.SetComponentData(center, new AeroState { Triggered = true });
+            stepEntries.Add(new UndoEntry { Box = center, From = c, RevertArrival = true });
+
+            foreach (var d in Dirs)
+            {
+                int2 nb = c + d;
+                if (!boxMap.TryGetValue(nb, out var b)) continue;
+                if (IsLocked(b)) continue;
+                int2 dest = nb + d;
+                if (IsWall(flags, W, H, dest) || boxMap.ContainsKey(dest) || math.all(dest == playerCell)) continue;
+                MoveBox(b, nb, dest, boxMap, stepEntries, duration);
+                OnBoxArrived(b, d, flags, W, H, stepEntries, queue);
+            }
+        }
+
+        // 衍射推动：沿到达方向射线上的所有箱子各推进一格。远→近处理，整列连推不自撞；遇墙/被占/锁定箱则该箱不动。
+        private void SpectroBeam(Entity center, int2 dir, NativeHashMap<int2, Entity> boxMap, NativeArray<byte> flags,
+            int W, int H, int2 playerCell, float duration, NativeList<UndoEntry> stepEntries, NativeQueue<Arrival> queue)
+        {
+            int2 c = EntityManager.GetComponentData<GridPosition>(center).Value;
+            EntityManager.SetComponentData(center, new SpectroState { Triggered = true });
+            stepEntries.Add(new UndoEntry { Box = center, From = c, RevertArrival = true });
+            if (math.all(dir == int2.zero)) return;
+
+            var line = new NativeList<int2>(Allocator.Temp);
+            for (int2 p = c + dir; p.x >= 0 && p.x < W && p.y >= 0 && p.y < H; p += dir)
+                if (boxMap.ContainsKey(p)) line.Add(p);
+
+            for (int i = line.Length - 1; i >= 0; i--)
+            {
+                int2 from = line[i];
+                if (!boxMap.TryGetValue(from, out var b)) continue;
+                if (IsLocked(b)) continue; // 锁定湮灭箱=墙
+                int2 dest = from + dir;
+                if (IsWall(flags, W, H, dest) || boxMap.ContainsKey(dest) || math.all(dest == playerCell)) continue;
+                MoveBox(b, from, dest, boxMap, stepEntries, duration);
+                OnBoxArrived(b, dir, flags, W, H, stepEntries, queue);
+            }
+            line.Dispose();
+        }
+
+        // 移动一个箱子：记撤销、更新位置查询表、设逻辑位置、播放动画。
+        private void MoveBox(Entity b, int2 from, int2 to, NativeHashMap<int2, Entity> boxMap,
+            NativeList<UndoEntry> stepEntries, float duration)
+        {
+            stepEntries.Add(new UndoEntry { Box = b, From = from, RevertArrival = false });
+            boxMap.Remove(from);
+            boxMap.Add(to, b);
+            EntityManager.SetComponentData(b, new GridPosition { Value = to });
+            Animate(b, to, duration);
+        }
+
+        // 箱子到达新格后的「首次到达」结算：湮灭即时锁定；气动/衍射入队待调度（含连锁）。
+        private void OnBoxArrived(Entity b, int2 dir, NativeArray<byte> flags, int W, int H,
+            NativeList<UndoEntry> stepEntries, NativeQueue<Arrival> queue)
+        {
+            TryLockHavoc(b, flags, W, H, stepEntries);
+            if (IsAeroArrival(b, flags, W, H) || IsSpectroArrival(b, flags, W, H))
+                queue.Enqueue(new Arrival { Box = b, Dir = dir });
         }
 
         // 气动箱(持 AeroState)、未触发、且当前格带气动(A)目标位 → 视为「首次到达」。
@@ -188,6 +235,16 @@ namespace Sokoban
             int2 p = EntityManager.GetComponentData<GridPosition>(e).Value;
             if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) return false;
             return (flags[p.y * W + p.x] & GridFlags.TargetA) != 0;
+        }
+
+        // 衍射箱(持 SpectroState)、未触发、且当前格带衍射(C)目标位 → 视为「首次到达」。
+        private bool IsSpectroArrival(Entity e, NativeArray<byte> flags, int W, int H)
+        {
+            if (e == Entity.Null || !EntityManager.HasComponent<SpectroState>(e)) return false;
+            if (EntityManager.GetComponentData<SpectroState>(e).Triggered) return false;
+            int2 p = EntityManager.GetComponentData<GridPosition>(e).Value;
+            if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) return false;
+            return (flags[p.y * W + p.x] & GridFlags.TargetC) != 0;
         }
 
         // 湮灭箱已锁定 → 等同墙：玩家与气动爆发都推不动它。
@@ -310,7 +367,8 @@ namespace Sokoban
             {
                 count++;
                 int2 p = gp.ValueRO.Value;
-                byte need = kind.ValueRO.Value == 1 ? GridFlags.TargetB : GridFlags.TargetA;
+                byte k = kind.ValueRO.Value;
+                byte need = k == 2 ? GridFlags.TargetC : k == 1 ? GridFlags.TargetB : GridFlags.TargetA;
                 if ((grid[p.y * W + p.x].Flags & need) == 0) { all = false; break; }
             }
             if (count > 0 && all)
@@ -336,15 +394,19 @@ namespace Sokoban
             float4 onA = ToFloat4(CellType.BoxOnTarget.ToColor());
             float4 baseB = ToFloat4(CellType.BoxB.ToColor());
             float4 onB = ToFloat4(CellType.BoxBOnTarget.ToColor());
+            float4 baseC = ToFloat4(CellType.BoxC.ToColor());
+            float4 onC = ToFloat4(CellType.BoxCOnTarget.ToColor());
 
             foreach (var (gp, kind, col) in
                      SystemAPI.Query<RefRO<GridPosition>, RefRO<BoxKind>, RefRW<URPMaterialPropertyBaseColor>>().WithAll<Box>())
             {
                 int2 p = gp.ValueRO.Value;
-                bool isB = kind.ValueRO.Value == 1;
-                byte need = isB ? GridFlags.TargetB : GridFlags.TargetA;
+                byte k = kind.ValueRO.Value;
+                byte need = k == 2 ? GridFlags.TargetC : k == 1 ? GridFlags.TargetB : GridFlags.TargetA;
                 bool onMatch = (grid[p.y * W + p.x].Flags & need) != 0;
-                col.ValueRW.Value = onMatch ? (isB ? onB : onA) : (isB ? baseB : baseA);
+                float4 baseCol = k == 2 ? baseC : k == 1 ? baseB : baseA;
+                float4 onCol = k == 2 ? onC : k == 1 ? onB : onA;
+                col.ValueRW.Value = onMatch ? onCol : baseCol;
             }
         }
 
@@ -362,6 +424,34 @@ namespace Sokoban
         {
             var ctrl = SystemAPI.GetSingletonRW<ControlRequest>();
             var stateRef = SystemAPI.GetSingletonRW<GameState>();
+
+            // 从菜单选定某关：加载该关并进入游戏。
+            if (ctrl.ValueRO.SelectLevel >= 0)
+            {
+                int count = math.max(1, stateRef.ValueRO.LevelCount);
+                stateRef.ValueRW.LevelIndex = math.clamp(ctrl.ValueRO.SelectLevel, 0, count - 1);
+                stateRef.ValueRW.InLevelSelect = false;
+                ctrl.ValueRW.SelectLevel = -1;
+                RequestRespawn();
+                return;
+            }
+
+            // 返回选关界面：清空当前关卡实体，进入菜单态（不生成新关卡）。
+            if (ctrl.ValueRO.OpenMenu)
+            {
+                ctrl.ValueRW.OpenMenu = false;
+                EnterLevelSelect();
+                return;
+            }
+
+            // 处于选关界面时，忽略其余游戏内请求（防御性，正常已被输入系统屏蔽）。
+            if (stateRef.ValueRO.InLevelSelect)
+            {
+                ctrl.ValueRW.Reset = false;
+                ctrl.ValueRW.Undo = false;
+                ctrl.ValueRW.LevelDelta = 0;
+                return;
+            }
 
             if (ctrl.ValueRO.Reset)
             {
@@ -388,6 +478,24 @@ namespace Sokoban
         }
 
         private void RequestRespawn() => SystemAPI.GetSingletonRW<RespawnRequest>().ValueRW.Value = true;
+
+        // 进入选关界面：销毁当前关卡的全部可视实体并清状态，菜单覆盖层由 UI 显示。
+        private void EnterLevelSelect()
+        {
+            // 销毁实体是结构性变更，会让此前取得的 RefRW 句柄失效，故状态写入推迟到销毁之后重新获取。
+            var oldQuery = SystemAPI.QueryBuilder().WithAll<LevelElement>().Build();
+            EntityManager.DestroyEntity(oldQuery);
+
+            var singleton = SystemAPI.GetSingletonEntity<GameState>();
+            EntityManager.GetBuffer<UndoStep>(singleton).Clear();
+            EntityManager.GetBuffer<UndoEntry>(singleton).Clear();
+
+            var stateRW = SystemAPI.GetSingletonRW<GameState>();
+            stateRW.ValueRW.InLevelSelect = true;
+            stateRW.ValueRW.Won = false;
+            stateRW.ValueRW.Animating = false;
+            stateRW.ValueRW.Moves = 0;
+        }
 
         private void DoUndo()
         {
@@ -423,6 +531,8 @@ namespace Sokoban
                         EntityManager.SetComponentData(en.Box, new AeroState { Triggered = false });
                     if (EntityManager.HasComponent<HavocState>(en.Box))
                         EntityManager.SetComponentData(en.Box, new HavocState { Locked = false });
+                    if (EntityManager.HasComponent<SpectroState>(en.Box))
+                        EntityManager.SetComponentData(en.Box, new SpectroState { Triggered = false });
                 }
             }
             toRestore.Dispose();

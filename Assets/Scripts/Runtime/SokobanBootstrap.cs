@@ -54,10 +54,16 @@ namespace Sokoban
             var em = world.EntityManager;
 
             var singleton = em.CreateEntity();
-            em.AddComponentData(singleton, new GameState { LevelIndex = Mathf.Clamp(startLevel, 0, database.Count - 1) });
+            // 开局进入选关界面：先不生成关卡，等玩家在菜单里选定关卡再触发生成。
+            em.AddComponentData(singleton, new GameState
+            {
+                LevelIndex = Mathf.Clamp(startLevel, 0, database.Count - 1),
+                LevelCount = database.Count, // 供 UI 立即按关卡数生成选关按钮
+                InLevelSelect = true,
+            });
             em.AddComponentData(singleton, new MoveCommand());
-            em.AddComponentData(singleton, new ControlRequest());
-            em.AddComponentData(singleton, new RespawnRequest { Value = true }); // 触发首关生成
+            em.AddComponentData(singleton, new ControlRequest { SelectLevel = -1 });
+            em.AddComponentData(singleton, new RespawnRequest { Value = false }); // 选关后再触发生成
             em.AddBuffer<GridCell>(singleton);
             em.AddBuffer<UndoStep>(singleton);
             em.AddBuffer<UndoEntry>(singleton);

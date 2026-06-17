@@ -81,6 +81,7 @@ namespace Sokoban
                     if (c.IsWall()) flags |= GridFlags.Wall;
                     if (c.IsTargetA()) flags |= GridFlags.TargetA;
                     if (c.IsTargetB()) flags |= GridFlags.TargetB;
+                    if (c.IsTargetC()) flags |= GridFlags.TargetC;
                     grid[row * W + col] = new GridCell { Flags = flags };
                 }
             }
@@ -121,18 +122,21 @@ namespace Sokoban
                                 em.AddComponentData(e, new GridPosition { Value = cell });
                                 em.AddComponent<Box>(e);
                                 em.AddComponentData(e, new BoxKind { Value = boxKind });
-                                // 气动箱携带触发状态；若出生即在匹配目标上，视为已触发（不爆发）。
+                                // 元素状态：出生即在匹配目标上者，视为已触发/已锁定。
                                 if (boxKind == 0)
                                     em.AddComponentData(e, new AeroState { Triggered = c.IsTargetA() });
-                                // 湮灭箱携带锁定状态；若出生即在匹配目标上，视为已锁定（直接不可推动）。
-                                else
+                                else if (boxKind == 1)
                                     em.AddComponentData(e, new HavocState { Locked = c.IsTargetB() });
-                                var boxColor = (boxKind == 1 ? CellType.BoxB : CellType.Box).ToColor();
+                                else // 衍射箱：到达即沿方向推动一次
+                                    em.AddComponentData(e, new SpectroState { Triggered = c.IsTargetC() });
+                                var boxCell = boxKind == 2 ? CellType.BoxC : boxKind == 1 ? CellType.BoxB : CellType.Box;
+                                var boxColor = boxCell.ToColor();
                                 em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(boxColor) });
                                 break;
                             case VisualKind.Target:
-                                var targetColor = (c.TargetKindOf() == 1 ? CellType.TargetB : CellType.Target).ToColor();
-                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(targetColor) });
+                                byte tk = c.TargetKindOf();
+                                var targetCell = tk == 2 ? CellType.TargetC : tk == 1 ? CellType.TargetB : CellType.Target;
+                                em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(targetCell.ToColor()) });
                                 break;
                             case VisualKind.Player:
                                 playerPlaced = true;

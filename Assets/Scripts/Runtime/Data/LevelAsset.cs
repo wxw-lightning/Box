@@ -79,8 +79,10 @@ namespace Sokoban
         // 按属性统计（A=绿 / B=紫）：可玩性要求每属性箱数与目标数各自配平。
         public int CountTargetsA() => Count(c => c.IsTargetA());
         public int CountTargetsB() => Count(c => c.IsTargetB());
+        public int CountTargetsC() => Count(c => c.IsTargetC());
         public int CountBoxesA() => Count(c => c.HasBox() && c.BoxKindOf() == 0);
         public int CountBoxesB() => Count(c => c.HasBox() && c.BoxKindOf() == 1);
+        public int CountBoxesC() => Count(c => c.HasBox() && c.BoxKindOf() == 2);
 
         /// <summary>预览/运行时会生成的对象总数：墙 + 地板 + 目标 + 箱子 + 玩家。</summary>
         public int EntityCount()

@@ -214,8 +214,8 @@ namespace Sokoban.Editor
         private static readonly (CellType type, string label)[] Brushes =
         {
             (CellType.Wall, "墙"),
-            (CellType.Target, "气动目标"), (CellType.TargetB, "湮灭目标"),
-            (CellType.Box, "气动箱"), (CellType.BoxB, "湮灭箱"),
+            (CellType.Target, "气动目标"), (CellType.TargetB, "湮灭目标"), (CellType.TargetC, "衍射目标"),
+            (CellType.Box, "气动箱"), (CellType.BoxB, "湮灭箱"), (CellType.BoxC, "衍射箱"),
             (CellType.Player, "玩家"),
             (CellType.Floor, "地板/橡皮"),
         };
@@ -224,13 +224,15 @@ namespace Sokoban.Editor
         {
             int boxesA = lvl.CountBoxesA(), targetsA = lvl.CountTargetsA();
             int boxesB = lvl.CountBoxesB(), targetsB = lvl.CountTargetsB();
+            int boxesC = lvl.CountBoxesC(), targetsC = lvl.CountTargetsC();
             int players = lvl.CountPlayers();
             EditorGUILayout.LabelField(
-                $"尺寸 {lvl.Width}×{lvl.Height}      气动 箱{boxesA}/目标{targetsA}   湮灭 箱{boxesB}/目标{targetsB}   玩家 {players}");
+                $"尺寸 {lvl.Width}×{lvl.Height}      气动 箱{boxesA}/目标{targetsA}   湮灭 箱{boxesB}/目标{targetsB}   衍射 箱{boxesC}/目标{targetsC}   玩家 {players}");
 
-            string reason = (boxesA + boxesB) == 0 ? "没有箱子"
+            string reason = (boxesA + boxesB + boxesC) == 0 ? "没有箱子"
                           : boxesA != targetsA ? "气动箱数 ≠ 目标数"
                           : boxesB != targetsB ? "湮灭箱数 ≠ 目标数"
+                          : boxesC != targetsC ? "衍射箱数 ≠ 目标数"
                           : players != 1 ? "玩家数应恰为 1"
                           : null;
             EditorGUILayout.HelpBox(reason == null ? "✓ 可玩" : "✗ " + reason,

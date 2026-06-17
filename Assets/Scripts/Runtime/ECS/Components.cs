@@ -21,6 +21,9 @@ namespace Sokoban
     /// <summary>湮灭箱（BoxKind 1）状态：首次到达匹配目标后锁定为不可推动（Locked，等同墙）。</summary>
     public struct HavocState : IComponentData { public bool Locked; }
 
+    /// <summary>衍射箱（BoxKind 2）状态：首次到达匹配目标会沿到达方向把该方向射线上所有箱子各推进一格，仅触发一次（Triggered）。</summary>
+    public struct SpectroState : IComponentData { public bool Triggered; }
+
     /// <summary>平滑移动动画：在 Duration 内把 LocalTransform.Position 从 From 插值到 To。</summary>
     public struct MoveAnimation : IComponentData
     {
@@ -43,7 +46,8 @@ namespace Sokoban
         public int LevelCount;
         public int Moves;
         public bool Won;
-        public bool Animating; // 有移动动画进行中
+        public bool Animating;     // 有移动动画进行中
+        public bool InLevelSelect; // 处于选关界面：未生成关卡，HUD 隐藏，菜单显示
     }
 
     /// <summary>静态层网格标志。索引 = row*Width+col。</summary>
@@ -52,8 +56,9 @@ namespace Sokoban
     public static class GridFlags
     {
         public const byte Wall = 1 << 0;
-        public const byte TargetA = 1 << 1; // 目标A（绿）
-        public const byte TargetB = 1 << 2; // 目标B（紫）
+        public const byte TargetA = 1 << 1; // 目标A（绿/气动）
+        public const byte TargetB = 1 << 2; // 目标B（紫/湮灭）
+        public const byte TargetC = 1 << 3; // 目标C（黄/衍射）
     }
 
     /// <summary>本帧的移动指令（由输入系统写，移动系统消费）。</summary>
@@ -64,7 +69,9 @@ namespace Sokoban
     {
         public bool Undo;
         public bool Reset;
-        public int LevelDelta; // +1 下一关 / -1 上一关
+        public int LevelDelta;  // +1 下一关 / -1 上一关
+        public int SelectLevel; // 选关：>=0 直接加载该关并进入游戏；-1 表示无请求
+        public bool OpenMenu;   // 返回选关界面
     }
 
     /// <summary>置 true 触发 LevelSpawnSystem 重建当前关卡。</summary>

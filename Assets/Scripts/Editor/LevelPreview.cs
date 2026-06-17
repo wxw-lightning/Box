@@ -48,7 +48,12 @@ namespace Sokoban.Editor
         {
             VisualKind.Wall => CellType.Wall.ToColor(),
             VisualKind.Floor => CellType.Floor.ToColor(),
-            VisualKind.Target => (cell.TargetKindOf() == 1 ? CellType.TargetB : CellType.Target).ToColor(),
+            VisualKind.Target => (cell.TargetKindOf() switch
+            {
+                2 => CellType.TargetC,
+                1 => CellType.TargetB,
+                _ => CellType.Target,
+            }).ToColor(),
             VisualKind.Box => BoxColor(cell),
             VisualKind.Player => CellType.Player.ToColor(),
             _ => Color.gray,
@@ -58,7 +63,9 @@ namespace Sokoban.Editor
         {
             CellType.BoxOnTarget => CellType.BoxOnTarget.ToColor(),
             CellType.BoxBOnTarget => CellType.BoxBOnTarget.ToColor(),
+            CellType.BoxCOnTarget => CellType.BoxCOnTarget.ToColor(),
             CellType.BoxB => CellType.BoxB.ToColor(),
+            CellType.BoxC => CellType.BoxC.ToColor(),
             _ => CellType.Box.ToColor(),
         };
 
