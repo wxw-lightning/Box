@@ -26,10 +26,10 @@ MonoBehaviour:
       Data: 0|Sokoban.CellType[,], Sokoban.Runtime
     - Name: 
       Entry: 12
-      Data: 56
+      Data: 63
     - Name: ranks
       Entry: 1
-      Data: 8|7
+      Data: 9|7
     - Name: 
       Entry: 3
       Data: 1
@@ -80,10 +80,31 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
-      Data: 7
+      Data: 0
     - Name: 
       Entry: 3
-      Data: 2
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
     - Name: 
       Entry: 3
       Data: 0
@@ -122,10 +143,10 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
-      Data: 8
+      Data: 0
     - Name: 
       Entry: 3
-      Data: 3
+      Data: 0
     - Name: 
       Entry: 3
       Data: 0
@@ -146,7 +167,7 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
-      Data: 5
+      Data: 0
     - Name: 
       Entry: 3
       Data: 0
@@ -205,3 +226,4 @@ MonoBehaviour:
       Entry: 8
       Data: 
   levelName: "\u5173\u53611"
+  hint: 

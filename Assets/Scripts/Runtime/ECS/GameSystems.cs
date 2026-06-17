@@ -413,6 +413,47 @@ namespace Sokoban
         private static float4 ToFloat4(Color c) => new float4(c.r, c.g, c.b, c.a);
     }
 
+    /// <summary>
+    /// 机制图标驱动：图标跟随其箱子的（含动画的）位置平贴箱顶，并在该箱一次性机制触发(spent)后缩放为 0 隐藏。
+    /// 撤销会把机制状态翻回未触发 → 图标自动重新显示。在 MoveAnimationSystem 之后跑以读到最新位置。
+    /// </summary>
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateAfter(typeof(MoveAnimationSystem))]
+    public partial class BoxIconSystem : SystemBase
+    {
+        protected override void OnCreate() => RequireForUpdate<GameState>();
+
+        protected override void OnUpdate()
+        {
+            foreach (var (lt, owner) in
+                     SystemAPI.Query<RefRW<LocalTransform>, RefRO<IconOwner>>())
+            {
+                Entity box = owner.ValueRO.Box;
+                if (!EntityManager.Exists(box))
+                {
+                    lt.ValueRW.Scale = 0f; // 箱子已不存在：隐藏，等重生清理
+                    continue;
+                }
+
+                float3 bp = EntityManager.GetComponentData<LocalTransform>(box).Position;
+                lt.ValueRW.Position = new float3(bp.x, CellVisuals.IconY, bp.z);
+
+                byte kind = EntityManager.GetComponentData<BoxKind>(box).Value;
+                lt.ValueRW.Scale = IsMechanicSpent(box, kind) ? 0f : CellVisuals.IconSize;
+            }
+        }
+
+        // 按属性读取对应一次性状态：kind0 气动 Triggered / kind1 湮灭 Locked / kind2 衍射 Triggered。
+        private bool IsMechanicSpent(Entity e, byte kind)
+        {
+            if (kind == 1)
+                return EntityManager.HasComponent<HavocState>(e) && EntityManager.GetComponentData<HavocState>(e).Locked;
+            if (kind == 2)
+                return EntityManager.HasComponent<SpectroState>(e) && EntityManager.GetComponentData<SpectroState>(e).Triggered;
+            return EntityManager.HasComponent<AeroState>(e) && EntityManager.GetComponentData<AeroState>(e).Triggered;
+        }
+    }
+
     /// <summary>处理撤销/重置/切关请求。</summary>
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateBefore(typeof(MovementSystem))]

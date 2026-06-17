@@ -12,6 +12,10 @@ namespace Sokoban
     public struct Player : IComponentData { } // tag：唯一玩家
     public struct Box : IComponentData { }    // tag：箱子
 
+    /// <summary>图标实体 → 其所属箱子的链接。图标平贴在箱顶提示「机制可触发」；
+    /// 机制触发(spent)后由 <see cref="BoxIconSystem"/> 把图标缩放为 0 隐藏（撤销则恢复）。</summary>
+    public struct IconOwner : IComponentData { public Entity Box; }
+
     /// <summary>箱子属性：0=A（绿）1=B（紫）。须停在同属性目标格才算满足。</summary>
     public struct BoxKind : IComponentData { public byte Value; }
 
@@ -105,6 +109,11 @@ namespace Sokoban
         public Material Target;
         public Material BoxMat;
         public Material PlayerMat;
+        // 机制图标资源（均可空：某属性图标未指定则该类箱子不显示图标，游戏照常运行）。
+        public Mesh QuadMesh;       // 图标用四边形网格
+        public Material IconAero;   // 气动箱(kind 0)图标材质
+        public Material IconHavoc;  // 湮灭箱(kind 1)图标材质
+        public Material IconSpectro;// 衍射箱(kind 2)图标材质
         public LevelDatabase Db;
         public float MoveDuration = 0.12f;
     }

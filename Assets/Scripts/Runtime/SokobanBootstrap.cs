@@ -22,6 +22,13 @@ namespace Sokoban
         [Required] public Material boxMaterial;
         [Required] public Material playerMaterial;
 
+        [Title("机制图标 (可空，未指定则该类箱子不显示图标)")]
+        [Tooltip("留空则运行时取内置 Quad 网格")]
+        public Mesh quadMesh;
+        public Material iconAeroMaterial;    // 气动箱图标
+        public Material iconHavocMaterial;   // 湮灭箱图标
+        public Material iconSpectroMaterial; // 衍射箱图标
+
         [Title("玩法")]
         [MinValue(0)] public int startLevel = 0;
         [MinValue(0f)] public float moveDuration = 0.12f;
@@ -67,6 +74,8 @@ namespace Sokoban
             em.AddBuffer<GridCell>(singleton);
             em.AddBuffer<UndoStep>(singleton);
             em.AddBuffer<UndoEntry>(singleton);
+            var quad = quadMesh != null ? quadMesh : Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+
             em.AddComponentObject(singleton, new RenderResources
             {
                 CubeMesh = mesh,
@@ -75,6 +84,10 @@ namespace Sokoban
                 Target = targetMaterial,
                 BoxMat = boxMaterial,
                 PlayerMat = playerMaterial,
+                QuadMesh = quad,
+                IconAero = iconAeroMaterial,
+                IconHavoc = iconHavocMaterial,
+                IconSpectro = iconSpectroMaterial,
                 Db = database,
                 MoveDuration = moveDuration,
             });

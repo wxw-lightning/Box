@@ -41,8 +41,15 @@ namespace Sokoban
         /// <summary>一个格子最多展开的元素数：地板 + 目标 + 箱子/玩家。</summary>
         public const int MaxPerCell = 3;
 
-        public static readonly CellVisual Floor  = new CellVisual(VisualKind.Floor,  -0.05f, new Vector3(1f,    0.1f,  1f));
-        public static readonly CellVisual Wall   = new CellVisual(VisualKind.Wall,    0.5f,  new Vector3(1f,    1f,    1f));
+        /// <summary>格子间留缝宽度（世界单位）：地板/墙的 XZ footprint 收缩量，露出深色背景形成网格边框。</summary>
+        public const float Gap = 0.08f;
+
+        /// <summary>机制图标平贴在箱顶的世界高度与边长（armed 显示；spent 后由 <see cref="Sokoban.BoxIconSystem"/> 缩放为 0 隐藏）。</summary>
+        public const float IconY = 1.0f;
+        public const float IconSize = 0.5f;
+
+        public static readonly CellVisual Floor  = new CellVisual(VisualKind.Floor,  -0.05f, new Vector3(1f - Gap, 0.1f,  1f - Gap));
+        public static readonly CellVisual Wall   = new CellVisual(VisualKind.Wall,    0.5f,  new Vector3(1f - Gap, 1f,    1f - Gap));
         public static readonly CellVisual Target = new CellVisual(VisualKind.Target,  0.03f, new Vector3(0.45f, 0.04f, 0.45f));
         public static readonly CellVisual Box    = new CellVisual(VisualKind.Box,     0.4f,  new Vector3(0.8f,  0.8f,  0.8f));
         public static readonly CellVisual Player = new CellVisual(VisualKind.Player,  0.5f,  new Vector3(0.7f,  1f,    0.7f));

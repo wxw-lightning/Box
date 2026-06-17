@@ -295,7 +295,7 @@ Light:
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 2
+    m_Type: 0
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
@@ -408,11 +408,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   database: {fileID: 11400000, guid: 8fc0b1de933fb6046b9f217d6c7033b9, type: 2}
   cubeMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  floorMaterial: {fileID: 2100000, guid: c342d7dcc01d1b0408436a4a931e4592, type: 2}
+  floorMaterial: {fileID: 2100000, guid: 8e025f3112e02b44b9e721e2a7f70746, type: 2}
   wallMaterial: {fileID: 2100000, guid: fe31989be52cf434180be229d796b1dc, type: 2}
   targetMaterial: {fileID: 2100000, guid: a6d68ecd68b99c44ea50b4ac69ed2837, type: 2}
   boxMaterial: {fileID: 2100000, guid: c342d7dcc01d1b0408436a4a931e4592, type: 2}
   playerMaterial: {fileID: 2100000, guid: b431b1c7065d4334cae94d2b91692d7f, type: 2}
+  quadMesh: {fileID: 0}
+  iconAeroMaterial: {fileID: 2100000, guid: 3e2b90607aee2e942855ca25625f72ad, type: 2}
+  iconHavocMaterial: {fileID: 2100000, guid: f8958e1590d60e540872d0cf47b72a6a, type: 2}
+  iconSpectroMaterial: {fileID: 2100000, guid: 63c07f0f6bff39540b51076d1593f0f1, type: 2}
   startLevel: 0
   moveDuration: 0.12
 --- !u!4 &799632347

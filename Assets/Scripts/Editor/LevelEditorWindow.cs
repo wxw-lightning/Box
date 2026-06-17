@@ -143,9 +143,9 @@ namespace Sokoban.Editor
             }
             EditorGUILayout.EndHorizontal();
 
-            // 教学/提示：纯文本多行，运行时显示在关卡 UI 上。不影响左侧菜单，故无需重建树。
+            // 教学/提示：纯文本多行，运行时显示在关卡 UI 上。不影响左侧菜单。
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("教学提示", GUILayout.Width(48));
+            GUILayout.Label("提示", GUILayout.Width(48));
             string newHint = EditorGUILayout.TextArea(selected.hint ?? "",
                 EditorStyles.textArea, GUILayout.MinHeight(48));
             if (newHint != selected.hint)

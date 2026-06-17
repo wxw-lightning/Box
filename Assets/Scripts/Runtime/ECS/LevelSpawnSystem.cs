@@ -95,6 +95,25 @@ namespace Sokoban
             var rma = new RenderMeshArray(materials, new[] { res.CubeMesh });
             var desc = new RenderMeshDescription(ShadowCastingMode.On, receiveShadows: true);
 
+            // 机制图标渲染资源：仅为「已指定材质」的属性建一份 RenderMeshArray（四边形网格 + 不投影）。
+            // 未导入图片的属性 iconIndexByKind 保持 -1，对应箱子不生成图标。
+            var iconMatByKind = new Material[] { res.IconAero, res.IconHavoc, res.IconSpectro };
+            var iconIndexByKind = new int[] { -1, -1, -1 };
+            var iconRma = default(RenderMeshArray); // 值类型，不能为 null：用 hasIcons 标记是否有效
+            bool hasIcons = false;
+            var iconDesc = new RenderMeshDescription(ShadowCastingMode.Off, receiveShadows: false);
+            if (res.QuadMesh != null)
+            {
+                var present = new System.Collections.Generic.List<Material>(3);
+                for (int k = 0; k < 3; k++)
+                    if (iconMatByKind[k] != null) { iconIndexByKind[k] = present.Count; present.Add(iconMatByKind[k]); }
+                if (present.Count > 0)
+                {
+                    iconRma = new RenderMeshArray(present.ToArray(), new[] { res.QuadMesh });
+                    hasIcons = true;
+                }
+            }
+
             // —— 第 2 遍：建可渲染实体（结构性变更，此后不再触碰 grid 缓冲）。
             // 几何（材质索引 / y / scale）来自共享的 CellVisuals，保证与编辑器预览一致。
             // 防御：即使数据里误放了多个玩家，也只标记第一个为 Player，避免破坏单例查询。
@@ -132,6 +151,12 @@ namespace Sokoban
                                 var boxCell = boxKind == 2 ? CellType.BoxC : boxKind == 1 ? CellType.BoxB : CellType.Box;
                                 var boxColor = boxCell.ToColor();
                                 em.AddComponentData(e, new URPMaterialPropertyBaseColor { Value = ToFloat4(boxColor) });
+                                // 机制图标：armed 时平贴箱顶提示「可触发」，spent 后由 BoxIconSystem 隐藏。
+                                if (hasIcons && iconIndexByKind[boxKind] >= 0)
+                                {
+                                    bool spentAtSpawn = boxKind == 0 ? c.IsTargetA() : boxKind == 1 ? c.IsTargetB() : c.IsTargetC();
+                                    CreateIcon(em, iconRma, iconDesc, res.QuadMesh, iconIndexByKind[boxKind], cell, e, spentAtSpawn);
+                                }
                                 break;
                             case VisualKind.Target:
                                 byte tk = c.TargetKindOf();
@@ -170,6 +195,29 @@ namespace Sokoban
                 Value = new AABB { Center = b.center, Extents = b.extents }
             });
             return e;
+        }
+
+        // 在箱顶生成一个平贴的图标四边形：跟随/隐藏由 BoxIconSystem 负责，此处只装配渲染与链接。
+        private void CreateIcon(EntityManager em, RenderMeshArray rma, RenderMeshDescription desc,
+            Mesh quad, int materialIndex, int2 cell, Entity box, bool spent)
+        {
+            var e = em.CreateEntity();
+            RenderMeshUtility.AddComponents(e, em, in desc, rma,
+                MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, 0));
+
+            float3 pos = CellToWorld(cell, CellVisuals.IconY);
+            // 四边形默认法线 +Z；绕 X 轴 -90° 使法线朝上 +Y，俯视相机正面可见。
+            quaternion rot = quaternion.RotateX(math.radians(-90f));
+            float scale = spent ? 0f : CellVisuals.IconSize;
+            em.AddComponentData(e, LocalTransform.FromPositionRotationScale(pos, rot, scale));
+            em.AddComponentData(e, new IconOwner { Box = box });
+            em.AddComponent<LevelElement>(e);
+
+            var b = quad.bounds;
+            em.SetComponentData(e, new RenderBounds
+            {
+                Value = new AABB { Center = b.center, Extents = b.extents }
+            });
         }
 
         public static float3 CellToWorld(int2 cell, float y) => new float3(cell.x, y, -cell.y);

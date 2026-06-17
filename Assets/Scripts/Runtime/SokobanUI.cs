@@ -165,7 +165,7 @@ namespace Sokoban
             img.color = new Color(0f, 0f, 0f, 0.55f);
             Stretch(img.rectTransform);
 
-            var winText = CreateText(_winPanel.transform, "WinText", 48, TextAnchor.MiddleCenter, Color.white);
+            var winText = CreateText(_winPanel.transform, "WinText", 54, TextAnchor.MiddleCenter, Color.white);
             winText.text = "过关！\nLevel Clear\n\n按 N 下一关 / R 重玩 / 选关返回";
             Stretch(winText.rectTransform);
             _winPanel.SetActive(false);
@@ -183,7 +183,7 @@ namespace Sokoban
             _menuRoot.GetComponent<Image>().color = new Color(0.10f, 0.11f, 0.14f, 1f);
             Stretch((RectTransform)_menuRoot.transform);
 
-            var title = CreateText(_menuRoot.transform, "Title", 40, TextAnchor.UpperCenter, Color.white);
+            var title = CreateText(_menuRoot.transform, "Title", 46, TextAnchor.UpperCenter, Color.white);
             title.text = "选择关卡";
             var titleRt = title.rectTransform;
             titleRt.anchorMin = new Vector2(0f, 1f);
@@ -192,7 +192,7 @@ namespace Sokoban
             titleRt.anchoredPosition = new Vector2(0f, -40f);
             titleRt.sizeDelta = new Vector2(0f, 60f);
 
-            var subtitle = CreateText(_menuRoot.transform, "Subtitle", 20, TextAnchor.UpperCenter,
+            var subtitle = CreateText(_menuRoot.transform, "Subtitle", 24, TextAnchor.UpperCenter,
                 new Color(0.7f, 0.72f, 0.78f));
             subtitle.text = "点击关卡开始游戏";
             var subRt = subtitle.rectTransform;
@@ -227,7 +227,7 @@ namespace Sokoban
             Stretch((RectTransform)_hudRoot.transform);
             var hud = _hudRoot.transform;
 
-            _infoText = CreateText(hud, "Info", 22, TextAnchor.UpperLeft, Color.white);
+            _infoText = CreateText(hud, "Info", 26, TextAnchor.UpperLeft, Color.white);
             var infoRt = _infoText.rectTransform;
             infoRt.anchorMin = new Vector2(0f, 1f);
             infoRt.anchorMax = new Vector2(1f, 1f);
@@ -236,15 +236,15 @@ namespace Sokoban
             infoRt.sizeDelta = new Vector2(-24f, 60f);
 
             // 教学提示：信息栏下方，淡黄色多行自动换行。空串则不占视觉空间。
-            _hintText = CreateText(hud, "Hint", 20, TextAnchor.UpperLeft,
+            _hintText = CreateText(hud, "Hint", 32, TextAnchor.UpperLeft,
                 new Color(1f, 0.92f, 0.55f));
             _hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
             var hintRt = _hintText.rectTransform;
             hintRt.anchorMin = new Vector2(0f, 1f);
             hintRt.anchorMax = new Vector2(1f, 1f);
             hintRt.pivot = new Vector2(0f, 1f);
-            hintRt.anchoredPosition = new Vector2(12f, -72f);
-            hintRt.sizeDelta = new Vector2(-24f, 120f);
+            hintRt.anchoredPosition = new Vector2(12f, -84f);
+            hintRt.sizeDelta = new Vector2(-24f, 140f);
 
             // 底部按钮行（4 颗，中心间距 120）。
             CreateButton(hud, "重玩 (R)", new Vector2(-180f, 30f), SendReset);
@@ -299,7 +299,7 @@ namespace Sokoban
             rt.anchoredPosition = bottomCenterOffset;
             go.GetComponent<Button>().onClick.AddListener(onClick);
 
-            var txt = CreateText(go.transform, "Label", 18, TextAnchor.MiddleCenter, Color.white);
+            var txt = CreateText(go.transform, "Label", 22, TextAnchor.MiddleCenter, Color.white);
             txt.text = label;
             Stretch(txt.rectTransform);
         }
@@ -312,7 +312,7 @@ namespace Sokoban
             go.GetComponent<Image>().color = new Color(0.22f, 0.34f, 0.5f, 0.95f);
             go.GetComponent<Button>().onClick.AddListener(onClick);
 
-            var txt = CreateText(go.transform, "Label", 20, TextAnchor.MiddleCenter, Color.white);
+            var txt = CreateText(go.transform, "Label", 24, TextAnchor.MiddleCenter, Color.white);
             txt.horizontalOverflow = HorizontalWrapMode.Wrap;
             txt.text = label;
             Stretch(txt.rectTransform);

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8dc8c485839b3fe4cb09b828513e19a9, type: 3}
-  m_Name: Level1_Copy
+  m_Name: Level0
   m_EditorClassIdentifier: 
   serializationData:
     SerializedFormat: 2
@@ -26,25 +26,10 @@ MonoBehaviour:
       Data: 0|Sokoban.CellType[,], Sokoban.Runtime
     - Name: 
       Entry: 12
-      Data: 96
+      Data: 63
     - Name: ranks
       Entry: 1
-      Data: 8|12
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
+      Data: 9|7
     - Name: 
       Entry: 3
       Data: 1
@@ -72,57 +57,6 @@ MonoBehaviour:
     - Name: 
       Entry: 3
       Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 7
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 2
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
     - Name: 
       Entry: 3
       Data: 0
@@ -161,52 +95,22 @@ MonoBehaviour:
       Data: 1
     - Name: 
       Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
       Data: 1
     - Name: 
       Entry: 3
       Data: 0
     - Name: 
       Entry: 3
-      Data: 3
+      Data: 0
     - Name: 
       Entry: 3
       Data: 8
     - Name: 
       Entry: 3
-      Data: 0
+      Data: 7
     - Name: 
       Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
+      Data: 7
     - Name: 
       Entry: 3
       Data: 1
@@ -221,16 +125,22 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
+      Data: 8
     - Name: 
       Entry: 3
       Data: 1
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 0
     - Name: 
       Entry: 3
       Data: 0
@@ -249,9 +159,6 @@ MonoBehaviour:
     - Name: 
       Entry: 3
       Data: 1
-    - Name: 
-      Entry: 3
-      Data: 0
     - Name: 
       Entry: 3
       Data: 0
@@ -266,6 +173,12 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
       Data: 1
     - Name: 
       Entry: 3
@@ -281,19 +194,7 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
+      Data: 0
     - Name: 
       Entry: 3
       Data: 1
@@ -324,5 +225,5 @@ MonoBehaviour:
     - Name: 
       Entry: 8
       Data: 
-  levelName: "\u5173\u53611 Copy"
-  hint: "\u8FD9\u5173\u67092\u79CD\u7BB1\u5B50"
+  levelName: "\u5173\u53610"
+  hint: "\u5C5E\u6027\u63A8\u7BB1\u5B50\u3002\u9700\u8981\u5C06\u6240\u6709\u7BB1\u5B50\u63A8\u5230\u5BF9\u5E94\u989C\u8272\u7684\u76EE\u6807\u70B9\u4E0A\u3002\u6E6E\u706D\u7BB1\uFF1A\u9996\u6B21\u5230\u8FBE\u76EE\u6807\u70B9\u65F6\u4F1A\u5C06\u81EA\u8EAB\u56FA\u5B9A\uFF0C\u65E0\u6CD5\u518D\u88AB\u63A8\u52A8\u3002"
