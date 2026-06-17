@@ -125,6 +125,16 @@ namespace Sokoban
         private void SendOpenMenu() => Mutate((ref ControlRequest c) => c.OpenMenu = true);
         private void SendSelectLevel(int index) => Mutate((ref ControlRequest c) => c.SelectLevel = index);
 
+        // 退出游戏：编辑器内停止播放，独立构建版调用 Application.Quit。
+        private void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
         private delegate void CtrlMutator(ref ControlRequest c);
 
         private void Mutate(CtrlMutator mutator)
@@ -215,12 +225,15 @@ namespace Sokoban
             gridRt.offsetMax = Vector2.zero;
 
             var grid = gridGo.GetComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(150f, 52f);
+            grid.cellSize = new Vector2(172f, 60f);
             grid.spacing = new Vector2(14f, 14f);
             grid.childAlignment = TextAnchor.MiddleCenter;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 5;
             _levelGrid = gridGo.transform;
+
+            // 退出游戏按钮（菜单底部居中，位于关卡网格下方的留白区）。
+            CreateButton(_menuRoot.transform, "退出游戏", new Vector2(0f, 24f), QuitGame);
         }
 
         // 游戏内 HUD：信息栏、教学提示、底部按钮行（重玩/上一关/下一关/选关）。
@@ -250,11 +263,11 @@ namespace Sokoban
             hintRt.anchoredPosition = new Vector2(12f, -84f);
             hintRt.sizeDelta = new Vector2(-24f, 140f);
 
-            // 底部按钮行（4 颗，中心间距 120）。
-            CreateButton(hud, "重玩 (R)", new Vector2(-180f, 30f), SendReset);
-            CreateButton(hud, "上一关 (P)", new Vector2(-60f, 30f), SendPrev);
-            CreateButton(hud, "下一关 (N)", new Vector2(60f, 30f), SendNext);
-            CreateButton(hud, "选关", new Vector2(180f, 30f), SendOpenMenu);
+            // 底部按钮行（4 颗，中心间距 142，与放大后的按钮宽度留出间隙）。
+            CreateButton(hud, "重玩 (R)", new Vector2(-213f, 30f), SendReset);
+            CreateButton(hud, "上一关 (P)", new Vector2(-71f, 30f), SendPrev);
+            CreateButton(hud, "下一关 (N)", new Vector2(71f, 30f), SendNext);
+            CreateButton(hud, "选关", new Vector2(213f, 30f), SendOpenMenu);
         }
 
         // 世界就绪、关卡数据库可读后，按关卡数量生成关卡按钮（仅一次）。
@@ -299,7 +312,7 @@ namespace Sokoban
             rt.anchorMin = new Vector2(0.5f, 0f);
             rt.anchorMax = new Vector2(0.5f, 0f);
             rt.pivot = new Vector2(0.5f, 0f);
-            rt.sizeDelta = new Vector2(110f, 36f);
+            rt.sizeDelta = new Vector2(132f, 46f);
             rt.anchoredPosition = bottomCenterOffset;
             go.GetComponent<Button>().onClick.AddListener(onClick);
 
