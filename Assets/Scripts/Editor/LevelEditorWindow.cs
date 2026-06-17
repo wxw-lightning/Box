@@ -455,6 +455,11 @@ namespace Sokoban.Editor
         {
             if (selected == _lastSelected) return;
             _lastSelected = selected;
+            if (selected != null) // 尺寸输入框随所选关卡实时读取实际尺寸，而非停留在默认值
+            {
+                _newWidth = selected.Width;
+                _newHeight = selected.Height;
+            }
             _undoStack.Clear(); // 撤销历史按关卡隔离
             _solveResult = null; // 可解性结果按关卡隔离
             _solverStale = true;

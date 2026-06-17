@@ -16,7 +16,7 @@ namespace Sokoban
     /// 机制触发(spent)后由 <see cref="BoxIconSystem"/> 把图标缩放为 0 隐藏（撤销则恢复）。</summary>
     public struct IconOwner : IComponentData { public Entity Box; }
 
-    /// <summary>箱子属性：0=A（绿）1=B（紫）。须停在同属性目标格才算满足。</summary>
+    /// <summary>箱子属性：须停在同属性目标格才算满足。</summary>
     public struct BoxKind : IComponentData { public byte Value; }
 
     /// <summary>气动箱（BoxKind 0）状态：首次到达匹配目标会爆发推开四邻箱子一格，仅触发一次（Triggered）。</summary>

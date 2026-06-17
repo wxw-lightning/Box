@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8dc8c485839b3fe4cb09b828513e19a9, type: 3}
-  m_Name: Level1
+  m_Name: Level2
   m_EditorClassIdentifier: 
   serializationData:
     SerializedFormat: 2
@@ -26,10 +26,10 @@ MonoBehaviour:
       Data: 0|Sokoban.CellType[,], Sokoban.Runtime
     - Name: 
       Entry: 12
-      Data: 63
+      Data: 56
     - Name: ranks
       Entry: 1
-      Data: 9|7
+      Data: 8|7
     - Name: 
       Entry: 3
       Data: 1
@@ -77,61 +77,19 @@ MonoBehaviour:
       Data: 1
     - Name: 
       Entry: 3
-      Data: 7
+      Data: 2
     - Name: 
       Entry: 3
-      Data: 8
+      Data: 3
     - Name: 
       Entry: 3
-      Data: 0
+      Data: 2
     - Name: 
       Entry: 3
-      Data: 0
+      Data: 3
     - Name: 
       Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 7
-    - Name: 
-      Entry: 3
-      Data: 1
-    - Name: 
-      Entry: 3
-      Data: 1
+      Data: 2
     - Name: 
       Entry: 3
       Data: 1
@@ -141,18 +99,18 @@ MonoBehaviour:
     - Name: 
       Entry: 3
       Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 3
     - Name: 
       Entry: 3
       Data: 0
     - Name: 
       Entry: 3
       Data: 8
-    - Name: 
-      Entry: 3
-      Data: 0
-    - Name: 
-      Entry: 3
-      Data: 0
     - Name: 
       Entry: 3
       Data: 1
@@ -194,6 +152,27 @@ MonoBehaviour:
       Data: 0
     - Name: 
       Entry: 3
+      Data: 7
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 1
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
+      Data: 0
+    - Name: 
+      Entry: 3
       Data: 0
     - Name: 
       Entry: 3
@@ -225,5 +204,5 @@ MonoBehaviour:
     - Name: 
       Entry: 8
       Data: 
-  levelName: "\u5173\u53611"
-  hint: 
+  levelName: "\u5173\u53612"
+  hint: "\u6C14\u52A8\u7BB1\uFF1A\u9996\u6B21\u62B5\u8FBE\u76EE\u6807\u70B9\u65F6\u4F1A\u5C06\u5468\u56F4\u7684\u7BB1\u5B50\u63A8\u5F001\u683C"

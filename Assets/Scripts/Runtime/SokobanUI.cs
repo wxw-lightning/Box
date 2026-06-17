@@ -170,6 +170,10 @@ namespace Sokoban
             Stretch(winText.rectTransform);
             _winPanel.SetActive(false);
 
+            // 过关黑幕是全屏覆盖层，会盖住并拦截底部按钮的点击；
+            // 把 HUD 置为画布最后一个子节点，使其（含底部按钮）渲染与射线检测都在黑幕之上。
+            _hudRoot.transform.SetAsLastSibling();
+
             // 开局先显示选关界面。
             _menuRoot.SetActive(true);
             _hudRoot.SetActive(false);
